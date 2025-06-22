@@ -425,9 +425,9 @@ class BookmarkManager {
             <div class="group relative flex flex-col items-center rounded-xl hover:shadow-md transition-all duration-200 cursor-pointer pb-2" 
                  data-bookmark-id="${bookmark.id}" 
                  draggable="true">
-                <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-1 group-hover:scale-105 transition-transform">
-                    <img src="${bookmark.favicon}" alt="" class="w-10 h-10 rounded-lg bookmark-favicon" style="display: ${bookmark.favicon ? 'block' : 'none'};">
-                    <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white text-lg font-bold bookmark-fallback" style="display: ${bookmark.favicon ? 'none' : 'block'};">
+                <div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mb-1 group-hover:scale-105 transition-transform">
+                    <img src="${bookmark.favicon}" alt="" class="w-14 h-14 rounded-lg bookmark-favicon" style="display: ${bookmark.favicon ? 'block' : 'none'};">
+                    <div class="w-14 h-14 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xl font-bold bookmark-fallback" style="display: ${bookmark.favicon ? 'none' : 'block'};">
                         ${bookmark.title.charAt(0).toUpperCase()}
                     </div>
                 </div>
@@ -603,6 +603,30 @@ class BookmarkManager {
         }
         
         const modal = document.getElementById('editBookmarkModal');
+        const modalTitle = modal.querySelector('h3');
+        modalTitle.textContent = 'Edit Bookmark';
+        
+        document.getElementById('editBookmarkTitle').value = bookmark.title;
+        document.getElementById('editBookmarkUrl').value = bookmark.url;
+        document.getElementById('editBookmarkCategory').value = bookmark.category || '';
+        
+        modal.classList.remove('hidden');
+        document.getElementById('editBookmarkTitle').focus();
+    }
+
+    showDuplicateBookmarkModal() {
+        console.log('showDuplicateBookmarkModal called, currentBookmarkId:', this.currentBookmarkId);
+        const bookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
+        console.log('Found bookmark:', bookmark);
+        if (!bookmark) {
+            console.log('No bookmark found, exiting');
+            return;
+        }
+        
+        const modal = document.getElementById('editBookmarkModal');
+        const modalTitle = modal.querySelector('h3');
+        modalTitle.textContent = 'Duplicate Bookmark';
+        
         document.getElementById('editBookmarkTitle').value = bookmark.title;
         document.getElementById('editBookmarkUrl').value = bookmark.url;
         document.getElementById('editBookmarkCategory').value = bookmark.category || '';
@@ -686,7 +710,7 @@ class BookmarkManager {
         this.renderQuickAccess();
         
         this.currentBookmarkId = duplicatedBookmark.id;
-        this.showEditBookmarkModal();
+        this.showDuplicateBookmarkModal();
         
         setTimeout(() => {
             const titleInput = document.getElementById('editBookmarkTitle');
