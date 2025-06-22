@@ -701,6 +701,10 @@ class BookmarkManager {
         
         if (!bookmark) return;
         
+        // Update the confirmation message with the bookmark title
+        const messageElement = document.getElementById('deleteConfirmMessage');
+        messageElement.innerHTML = `Are you sure you want to delete <strong>${bookmark.title}</strong>?`;
+        
         // Position the popup near the bookmark being deleted
         const bookmarkElement = document.querySelector(`[data-bookmark-id="${this.currentBookmarkId}"]`);
         if (bookmarkElement) {
