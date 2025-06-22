@@ -1,5 +1,5 @@
 {
-  "name": "newtab-bookmarks",
+  "name": "quiclick",
   "private": true,
   "scripts": {
     "build-css": "tailwindcss -i ./src/main.css -o ./tailwind.css --nowatch"

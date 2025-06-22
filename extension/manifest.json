@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "YouTab Bookmarks",
+  "name": "QuiClick",
   "version": "1.0",
-  "description": "Modern bookmark management for new tab pages",
+  "description": "Quick bookmark access for new tab pages",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
