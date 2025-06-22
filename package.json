@@ -2,7 +2,7 @@
   "name": "newtab-bookmarks",
   "private": true,
   "scripts": {
-    "build-css": "tailwindcss -i ./src/main.css -o ./tailwind.css --watch"
+    "build-css": "tailwindcss -i ./src/main.css -o ./tailwind.css --nowatch"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.10",
