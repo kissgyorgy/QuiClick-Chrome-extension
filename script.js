@@ -321,20 +321,20 @@ class BookmarkManager {
             }
         }
 
-        const faviconUrl = await this.getHighResolutionFavicon(url);
-
         const bookmark = {
             id: Date.now(),
             title: bookmarkTitle,
             url: url,
             category: 'General',
-            favicon: faviconUrl,
+            favicon: '',
             dateAdded: new Date().toISOString()
         };
 
         this.bookmarks.unshift(bookmark);
         await this.saveBookmarks();
         this.renderQuickAccess();
+        
+        this.updateFaviconAsync(bookmark.id, url);
     }
 
     async loadBookmarks() {
@@ -397,14 +397,12 @@ class BookmarkManager {
 
         if (!title || !url) return;
 
-        const faviconUrl = await this.getHighResolutionFavicon(url);
-
         const bookmark = {
             id: Date.now(),
             title,
             url,
             category,
-            favicon: faviconUrl,
+            favicon: '',
             dateAdded: new Date().toISOString()
         };
 
@@ -412,6 +410,8 @@ class BookmarkManager {
         await this.saveBookmarks();
         this.renderQuickAccess();
         this.hideAddBookmarkModal();
+        
+        this.updateFaviconAsync(bookmark.id, url);
     }
 
 
@@ -644,16 +644,14 @@ class BookmarkManager {
             return;
         }
 
-        console.log('Getting favicon...');
-        const faviconUrl = await this.getHighResolutionFavicon(url);
+        const oldUrl = this.bookmarks[bookmarkIndex].url;
 
         console.log('Updating bookmark...');
         this.bookmarks[bookmarkIndex] = {
             ...this.bookmarks[bookmarkIndex],
             title,
             url,
-            category,
-            favicon: faviconUrl
+            category
         };
 
         console.log('Saving bookmarks...');
@@ -662,6 +660,10 @@ class BookmarkManager {
         this.renderQuickAccess();
         console.log('Hiding modal...');
         this.hideEditBookmarkModal();
+        
+        if (url !== oldUrl) {
+            this.updateFaviconAsync(this.currentBookmarkId, url);
+        }
         console.log('Update complete');
     }
 
@@ -691,6 +693,28 @@ class BookmarkManager {
             titleInput.focus();
             titleInput.select();
         }, 100);
+    }
+
+    async updateFaviconAsync(bookmarkId, url) {
+        try {
+            const faviconUrl = await this.getHighResolutionFavicon(url);
+            const bookmarkIndex = this.bookmarks.findIndex(b => b.id === bookmarkId);
+            
+            if (bookmarkIndex !== -1) {
+                this.bookmarks[bookmarkIndex].favicon = faviconUrl;
+                await this.saveBookmarks();
+                
+                const bookmarkElement = document.querySelector(`[data-bookmark-id="${bookmarkId}"]`);
+                if (bookmarkElement) {
+                    const faviconImg = bookmarkElement.querySelector('.bookmark-favicon');
+                    if (faviconImg) {
+                        faviconImg.src = faviconUrl;
+                    }
+                }
+            }
+        } catch (error) {
+            console.log('Failed to update favicon asynchronously:', error);
+        }
     }
 
     showDeleteConfirmation(event) {
