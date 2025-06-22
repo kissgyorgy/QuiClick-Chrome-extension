@@ -76,6 +76,106 @@ class BookmarkManager {
         document.addEventListener('contextmenu', (e) => {
             e.preventDefault();
         });
+
+        // Drag and drop functionality
+        this.setupDragAndDrop();
+    }
+
+    setupDragAndDrop() {
+        const quickAccessContainer = document.getElementById('quickAccess');
+        
+        // Prevent default drag behaviors on document
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            document.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        // Handle drag over the container
+        quickAccessContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            quickAccessContainer.classList.add('bg-blue-50', 'border-2', 'border-dashed', 'border-blue-300');
+        });
+
+        // Handle drag leave
+        quickAccessContainer.addEventListener('dragleave', (e) => {
+            if (!quickAccessContainer.contains(e.relatedTarget)) {
+                quickAccessContainer.classList.remove('bg-blue-50', 'border-2', 'border-dashed', 'border-blue-300');
+            }
+        });
+
+        // Handle drop
+        quickAccessContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            quickAccessContainer.classList.remove('bg-blue-50', 'border-2', 'border-dashed', 'border-blue-300');
+            
+            // Get the dragged data - Chrome bookmarks provide multiple data formats
+            const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+            
+            // Try to get the bookmark title from different data types
+            let title = '';
+            
+            // Chrome bookmarks provide the title in 'text/x-moz-text-internal' or 'text/plain'
+            // When dragging from bookmark bar, the title is usually in text/plain when it's different from URL
+            const plainText = e.dataTransfer.getData('text/plain');
+            const htmlData = e.dataTransfer.getData('text/html');
+            
+            // If HTML data is available, try to extract title from it
+            if (htmlData) {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = htmlData;
+                const linkElement = tempDiv.querySelector('a');
+                if (linkElement && linkElement.textContent) {
+                    title = linkElement.textContent.trim();
+                }
+            }
+            
+            // If no title from HTML, use plain text if it's different from URL
+            if (!title && plainText && plainText !== url) {
+                title = plainText;
+            }
+            
+            if (url && this.isValidUrl(url)) {
+                this.addBookmarkFromDrop(title, url);
+            }
+        });
+    }
+
+    isValidUrl(string) {
+        try {
+            new URL(string);
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    async addBookmarkFromDrop(title, url) {
+        // Extract title from URL if not provided or if title is the same as URL
+        let bookmarkTitle = title;
+        if (!title || title === url) {
+            try {
+                const hostname = new URL(url).hostname;
+                bookmarkTitle = hostname.replace('www.', '');
+                bookmarkTitle = bookmarkTitle.charAt(0).toUpperCase() + bookmarkTitle.slice(1);
+            } catch (e) {
+                bookmarkTitle = 'Bookmark';
+            }
+        }
+
+        const bookmark = {
+            id: Date.now(),
+            title: bookmarkTitle,
+            url: url,
+            category: 'General',
+            favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=32`,
+            dateAdded: new Date().toISOString()
+        };
+
+        this.bookmarks.unshift(bookmark);
+        await this.saveBookmarks();
+        this.renderQuickAccess();
     }
 
     async loadBookmarks() {
