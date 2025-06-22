@@ -503,8 +503,8 @@ class BookmarkManager {
                  title="${bookmark.title}">
                 <a draggable="false" href="${bookmark.url}" aria-label="${bookmark.title}" class="absolute inset-0"></a>
                 <div class="tile-icon absolute inset-0 flex items-center justify-center">
-                    <img draggable="false" alt="" src="${bookmark.favicon}" class="w-6 h-6 bookmark-favicon" style="display: ${bookmark.favicon ? 'block' : 'none'};">
-                    <div class="w-6 h-6 bg-blue-500 rounded flex items-center justify-center text-white text-sm font-bold bookmark-fallback" style="display: ${bookmark.favicon ? 'none' : 'block'};">
+                    <img draggable="false" alt="" src="${bookmark.favicon}" class="w-20 h-20 rounded-lg object-cover bookmark-favicon" style="display: ${bookmark.favicon ? 'block' : 'none'};">
+                    <div class="w-20 h-20 bg-blue-500 rounded-lg flex items-center justify-center text-white text-3xl font-bold bookmark-fallback" style="display: ${bookmark.favicon ? 'none' : 'block'};">
                         ${bookmark.title.charAt(0).toUpperCase()}
                     </div>
                 </div>
