@@ -1,7 +1,6 @@
 class BookmarkManager {
     constructor() {
         this.bookmarks = [];
-        this.filteredBookmarks = [];
         this.init();
     }
 
@@ -28,10 +27,6 @@ class BookmarkManager {
             this.addBookmark();
         });
 
-        // Search functionality
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-            this.searchBookmarks(e.target.value);
-        });
 
         // Remove view toggle listeners since we only have favicon view now
 
@@ -47,12 +42,10 @@ class BookmarkManager {
         try {
             const result = await chrome.storage.local.get(['bookmarks']);
             this.bookmarks = result.bookmarks || this.getDefaultBookmarks();
-            this.filteredBookmarks = [...this.bookmarks];
-        } catch (error) {
+            } catch (error) {
             console.log('Using default bookmarks');
             this.bookmarks = this.getDefaultBookmarks();
-            this.filteredBookmarks = [...this.bookmarks];
-        }
+            }
     }
 
     getDefaultBookmarks() {
@@ -128,32 +121,18 @@ class BookmarkManager {
 
         this.bookmarks.unshift(bookmark);
         await this.saveBookmarks();
-        this.filteredBookmarks = [...this.bookmarks];
         this.renderQuickAccess();
         this.hideAddBookmarkModal();
     }
 
 
-    searchBookmarks(query) {
-        if (!query.trim()) {
-            this.filteredBookmarks = [...this.bookmarks];
-        } else {
-            const searchTerm = query.toLowerCase();
-            this.filteredBookmarks = this.bookmarks.filter(bookmark =>
-                bookmark.title.toLowerCase().includes(searchTerm) ||
-                bookmark.url.toLowerCase().includes(searchTerm) ||
-                bookmark.category.toLowerCase().includes(searchTerm)
-            );
-        }
-        this.renderQuickAccess();
-    }
 
     // Remove setView method since we only have favicon view now
 
     renderQuickAccess() {
         const quickAccessContainer = document.getElementById('quickAccess');
         
-        quickAccessContainer.innerHTML = this.filteredBookmarks.map(bookmark => `
+        quickAccessContainer.innerHTML = this.bookmarks.map(bookmark => `
             <div class="group relative flex flex-col items-center p-3 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 border border-transparent hover:border-gray-200">
                 <a href="${bookmark.url}" class="flex flex-col items-center">
                     <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
