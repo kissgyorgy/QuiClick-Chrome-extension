@@ -4,6 +4,8 @@ class BookmarkManager {
         this.currentBookmarkId = null;
         this.isDragging = false;
         this.draggedBookmarkId = null;
+        this.isDuplicateMode = false;
+        this.duplicatedBookmarkId = null;
         this.init();
     }
 
@@ -35,7 +37,7 @@ class BookmarkManager {
 
         // Edit bookmark modal events
         document.getElementById('cancelEditBtn').addEventListener('click', () => {
-            this.hideEditBookmarkModal();
+            this.cancelEditBookmarkModal();
         });
 
         document.getElementById('editBookmarkForm').addEventListener('submit', (e) => {
@@ -48,8 +50,21 @@ class BookmarkManager {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 this.hideAddBookmarkModal();
-                this.hideEditBookmarkModal();
+                this.cancelEditBookmarkModal();
                 this.hideDeleteConfirmation();
+            }
+        });
+
+        // Backdrop click handling for modals
+        document.getElementById('editBookmarkModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                this.cancelEditBookmarkModal();
+            }
+        });
+
+        document.getElementById('addBookmarkModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                this.hideAddBookmarkModal();
             }
         });
 
@@ -714,10 +729,22 @@ class BookmarkManager {
         document.getElementById('editBookmarkTitle').focus();
     }
 
-    hideEditBookmarkModal() {
+    async hideEditBookmarkModal() {
         document.getElementById('editBookmarkModal').classList.add('hidden');
         document.getElementById('editBookmarkForm').reset();
         this.currentBookmarkId = null;
+        this.isDuplicateMode = false;
+        this.duplicatedBookmarkId = null;
+    }
+
+    async cancelEditBookmarkModal() {
+        // If we're in duplicate mode and cancelling, delete the duplicate
+        if (this.isDuplicateMode && this.duplicatedBookmarkId) {
+            await this.deleteBookmarkById(this.duplicatedBookmarkId);
+            this.renderQuickAccess();
+        }
+        
+        this.hideEditBookmarkModal();
     }
 
     async updateBookmark() {
@@ -789,6 +816,8 @@ class BookmarkManager {
         this.renderQuickAccess();
         
         this.currentBookmarkId = duplicatedBookmark.id;
+        this.isDuplicateMode = true;
+        this.duplicatedBookmarkId = duplicatedBookmark.id;
         this.showDuplicateBookmarkModal();
         
         setTimeout(() => {
@@ -896,6 +925,11 @@ class BookmarkManager {
             await this.saveBookmarks();
             this.renderQuickAccess();
         }
+    }
+
+    async deleteBookmarkById(bookmarkId) {
+        this.bookmarks = this.bookmarks.filter(b => b.id !== bookmarkId);
+        await this.saveBookmarks();
     }
 
     // Removed unused bookmark card and list rendering methods
