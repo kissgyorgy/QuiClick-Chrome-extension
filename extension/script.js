@@ -38,6 +38,7 @@ class BookmarkManager {
 
         document.getElementById('editBookmarkForm').addEventListener('submit', (e) => {
             e.preventDefault();
+            console.log('Form submission triggered');
             this.updateBookmark();
         });
 
@@ -417,6 +418,7 @@ class BookmarkManager {
 
 
     showContextMenu(event, bookmarkId) {
+        console.log('showContextMenu called with bookmarkId:', bookmarkId);
         this.currentBookmarkId = bookmarkId;
         const contextMenu = document.getElementById('contextMenu');
         
@@ -443,8 +445,13 @@ class BookmarkManager {
     }
 
     showEditBookmarkModal() {
+        console.log('showEditBookmarkModal called, currentBookmarkId:', this.currentBookmarkId);
         const bookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
-        if (!bookmark) return;
+        console.log('Found bookmark:', bookmark);
+        if (!bookmark) {
+            console.log('No bookmark found, exiting');
+            return;
+        }
         
         const modal = document.getElementById('editBookmarkModal');
         document.getElementById('editBookmarkTitle').value = bookmark.title;
@@ -462,19 +469,36 @@ class BookmarkManager {
     }
 
     async updateBookmark() {
-        if (!this.currentBookmarkId) return;
+        console.log('updateBookmark called, currentBookmarkId:', this.currentBookmarkId);
+        
+        if (!this.currentBookmarkId) {
+            console.log('No currentBookmarkId, exiting');
+            return;
+        }
         
         const title = document.getElementById('editBookmarkTitle').value.trim();
         const url = document.getElementById('editBookmarkUrl').value.trim();
         const category = document.getElementById('editBookmarkCategory').value.trim() || 'General';
 
-        if (!title || !url) return;
+        console.log('Form values:', { title, url, category });
+
+        if (!title || !url) {
+            console.log('Missing title or url, exiting');
+            return;
+        }
 
         const bookmarkIndex = this.bookmarks.findIndex(b => b.id === this.currentBookmarkId);
-        if (bookmarkIndex === -1) return;
+        console.log('Found bookmark at index:', bookmarkIndex);
+        
+        if (bookmarkIndex === -1) {
+            console.log('Bookmark not found, exiting');
+            return;
+        }
 
+        console.log('Getting favicon...');
         const faviconUrl = await this.getHighResolutionFavicon(url);
 
+        console.log('Updating bookmark...');
         this.bookmarks[bookmarkIndex] = {
             ...this.bookmarks[bookmarkIndex],
             title,
@@ -483,9 +507,13 @@ class BookmarkManager {
             favicon: faviconUrl
         };
 
+        console.log('Saving bookmarks...');
         await this.saveBookmarks();
+        console.log('Rendering...');
         this.renderQuickAccess();
+        console.log('Hiding modal...');
         this.hideEditBookmarkModal();
+        console.log('Update complete');
     }
 
     async deleteBookmark() {
