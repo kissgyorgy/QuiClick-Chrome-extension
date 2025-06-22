@@ -2,6 +2,8 @@ class BookmarkManager {
     constructor() {
         this.bookmarks = [];
         this.currentBookmarkId = null;
+        this.isDragging = false;
+        this.draggedBookmarkId = null;
         this.init();
     }
 
@@ -95,19 +97,23 @@ class BookmarkManager {
         // Handle drag enter
         body.addEventListener('dragenter', (e) => {
             e.preventDefault();
-            dragCounter++;
             
-            // Add a visual overlay to indicate drop zone (excluding header)
-            if (!document.getElementById('dropOverlay')) {
-                const header = document.querySelector('header');
-                const headerHeight = header ? header.offsetHeight : 0;
+            // Only show overlay for external drags (not internal bookmark reordering)
+            if (!this.isDragging) {
+                dragCounter++;
                 
-                const overlay = document.createElement('div');
-                overlay.id = 'dropOverlay';
-                overlay.className = 'fixed left-0 right-0 bottom-0 bg-blue-100/10 backdrop-blur-sm border-4 border-dashed border-blue-400 z-40 flex items-center justify-center';
-                overlay.style.top = `${headerHeight}px`; // Start exactly at bottom of header
-                overlay.innerHTML = '<div class="text-blue-600 text-xl font-semibold">Drop bookmark here</div>';
-                body.appendChild(overlay);
+                // Add a visual overlay to indicate drop zone (excluding header)
+                if (!document.getElementById('dropOverlay')) {
+                    const header = document.querySelector('header');
+                    const headerHeight = header ? header.offsetHeight : 0;
+                    
+                    const overlay = document.createElement('div');
+                    overlay.id = 'dropOverlay';
+                    overlay.className = 'fixed left-0 right-0 bottom-0 bg-blue-100/10 backdrop-blur-sm border-4 border-dashed border-blue-400 z-40 flex items-center justify-center';
+                    overlay.style.top = `${headerHeight}px`; // Start exactly at bottom of header
+                    overlay.innerHTML = '<div class="text-blue-600 text-xl font-semibold">Drop bookmark here</div>';
+                    body.appendChild(overlay);
+                }
             }
         });
 
@@ -119,13 +125,17 @@ class BookmarkManager {
         // Handle drag leave
         body.addEventListener('dragleave', (e) => {
             e.preventDefault();
-            dragCounter--;
             
-            // Only remove overlay when all drag operations are done
-            if (dragCounter === 0) {
-                const overlay = document.getElementById('dropOverlay');
-                if (overlay) {
-                    overlay.remove();
+            // Only handle external drags
+            if (!this.isDragging) {
+                dragCounter--;
+                
+                // Only remove overlay when all drag operations are done
+                if (dragCounter === 0) {
+                    const overlay = document.getElementById('dropOverlay');
+                    if (overlay) {
+                        overlay.remove();
+                    }
                 }
             }
         });
@@ -133,14 +143,17 @@ class BookmarkManager {
         // Handle drop on entire page
         body.addEventListener('drop', (e) => {
             e.preventDefault();
-            dragCounter = 0; // Reset counter on drop
-            const overlay = document.getElementById('dropOverlay');
-            if (overlay) {
-                overlay.remove();
-            }
             
-            // Get the dragged data - Chrome bookmarks provide multiple data formats
-            const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+            // Only handle external drops (not internal bookmark reordering)
+            if (!this.isDragging) {
+                dragCounter = 0; // Reset counter on drop
+                const overlay = document.getElementById('dropOverlay');
+                if (overlay) {
+                    overlay.remove();
+                }
+                
+                // Get the dragged data - Chrome bookmarks provide multiple data formats
+                const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
             
             // Try to get the bookmark title from different data types
             let title = '';
@@ -178,8 +191,9 @@ class BookmarkManager {
                 title = plainText.trim();
             }
             
-            if (url && this.isValidUrl(url)) {
-                this.addBookmarkFromDrop(title, url);
+                if (url && this.isValidUrl(url)) {
+                    this.addBookmarkFromDrop(title, url);
+                }
             }
         });
     }
@@ -391,7 +405,9 @@ class BookmarkManager {
         const quickAccessContainer = document.getElementById('quickAccess');
         
         quickAccessContainer.innerHTML = this.bookmarks.map(bookmark => `
-            <div class="group relative flex flex-col items-center rounded-xl hover:shadow-md transition-all duration-200 cursor-pointer pb-2" data-bookmark-id="${bookmark.id}">
+            <div class="group relative flex flex-col items-center rounded-xl hover:shadow-md transition-all duration-200 cursor-pointer pb-2" 
+                 data-bookmark-id="${bookmark.id}" 
+                 draggable="true">
                 <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-1 group-hover:scale-105 transition-transform">
                     <img src="${bookmark.favicon}" alt="" class="w-10 h-10 rounded-lg bookmark-favicon">
                     <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white text-lg font-bold bookmark-fallback" style="display: none;">
@@ -406,9 +422,9 @@ class BookmarkManager {
         this.bookmarks.forEach(bookmark => {
             const bookmarkElement = quickAccessContainer.querySelector(`[data-bookmark-id="${bookmark.id}"]`);
             
-            // Left click - navigate to URL
+            // Left click - navigate to URL (only if not dragging)
             bookmarkElement.addEventListener('click', (e) => {
-                if (e.button === 0) { // Left click
+                if (e.button === 0 && !this.isDragging) { // Left click and not dragging
                     window.location.href = bookmark.url;
                 }
             });
@@ -417,6 +433,41 @@ class BookmarkManager {
             bookmarkElement.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 this.showContextMenu(e, bookmark.id);
+            });
+
+            // Drag start
+            bookmarkElement.addEventListener('dragstart', (e) => {
+                this.isDragging = true;
+                this.draggedBookmarkId = bookmark.id;
+                bookmarkElement.style.opacity = '0.5';
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', bookmarkElement.outerHTML);
+            });
+
+            // Drag end
+            bookmarkElement.addEventListener('dragend', (e) => {
+                this.isDragging = false;
+                this.draggedBookmarkId = null;
+                bookmarkElement.style.opacity = '1';
+                this.removeDragIndicator();
+            });
+
+            // Drag over - show drop indicator
+            bookmarkElement.addEventListener('dragover', (e) => {
+                if (this.draggedBookmarkId && this.draggedBookmarkId !== bookmark.id) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    this.showDragIndicator(bookmarkElement, e);
+                }
+            });
+
+            // Drop - reorder bookmarks
+            bookmarkElement.addEventListener('drop', (e) => {
+                if (this.draggedBookmarkId && this.draggedBookmarkId !== bookmark.id) {
+                    e.preventDefault();
+                    this.reorderBookmarks(this.draggedBookmarkId, bookmark.id, e);
+                    this.removeDragIndicator();
+                }
             });
 
             // Handle favicon error - show fallback
@@ -430,6 +481,65 @@ class BookmarkManager {
         });
     }
 
+    showDragIndicator(targetElement, event) {
+        this.removeDragIndicator();
+        
+        const rect = targetElement.getBoundingClientRect();
+        const midPoint = rect.left + rect.width / 2;
+        const isRightSide = event.clientX > midPoint;
+        
+        const indicator = document.createElement('div');
+        indicator.id = 'dragIndicator';
+        indicator.className = 'absolute top-0 bottom-0 w-1 bg-blue-500 z-50 rounded-full';
+        indicator.style.height = `${rect.height}px`;
+        
+        if (isRightSide) {
+            indicator.style.left = `${rect.right}px`;
+        } else {
+            indicator.style.left = `${rect.left - 4}px`;
+        }
+        
+        indicator.style.top = `${rect.top}px`;
+        document.body.appendChild(indicator);
+    }
+
+    removeDragIndicator() {
+        const indicator = document.getElementById('dragIndicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+
+    async reorderBookmarks(draggedId, targetId, event) {
+        const draggedIndex = this.bookmarks.findIndex(b => b.id == draggedId);
+        const targetIndex = this.bookmarks.findIndex(b => b.id == targetId);
+        
+        if (draggedIndex === -1 || targetIndex === -1) return;
+        
+        // Determine if we're inserting before or after the target
+        const targetElement = document.querySelector(`[data-bookmark-id="${targetId}"]`);
+        const rect = targetElement.getBoundingClientRect();
+        const midPoint = rect.left + rect.width / 2;
+        const insertAfter = event.clientX > midPoint;
+        
+        // Remove the dragged bookmark from its current position
+        const draggedBookmark = this.bookmarks.splice(draggedIndex, 1)[0];
+        
+        // Calculate new insert position
+        let newIndex = targetIndex;
+        if (draggedIndex < targetIndex) {
+            newIndex = insertAfter ? targetIndex : targetIndex - 1;
+        } else {
+            newIndex = insertAfter ? targetIndex + 1 : targetIndex;
+        }
+        
+        // Insert bookmark at new position
+        this.bookmarks.splice(newIndex, 0, draggedBookmark);
+        
+        // Save and re-render
+        await this.saveBookmarks();
+        this.renderQuickAccess();
+    }
 
     showContextMenu(event, bookmarkId) {
         console.log('showContextMenu called with bookmarkId:', bookmarkId);
