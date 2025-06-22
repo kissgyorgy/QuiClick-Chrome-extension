@@ -120,28 +120,33 @@ class BookmarkManager {
             console.log('Available data types:', e.dataTransfer.types);
             
             // Try various data formats to get the bookmark name
-            const bookmarkName = e.dataTransfer.getData('text/x-moz-text-internal') || 
-                                e.dataTransfer.getData('application/x-moz-nativehtml') ||
-                                e.dataTransfer.getData('text/plain');
-            
             const htmlData = e.dataTransfer.getData('text/html');
+            const plainText = e.dataTransfer.getData('text/plain');
+            const mozText = e.dataTransfer.getData('text/x-moz-text-internal');
+            const mozHtml = e.dataTransfer.getData('application/x-moz-nativehtml');
             
-            // First priority: Use bookmark name if it's different from URL
-            if (bookmarkName && bookmarkName !== url && !bookmarkName.startsWith('http')) {
-                title = bookmarkName.trim();
-            }
-            // Second priority: Extract title from HTML data
-            else if (htmlData) {
+            console.log('Data extraction:', { htmlData, plainText, mozText, mozHtml, url });
+            
+            // First priority: Extract title from HTML data (most reliable for bookmarks)
+            if (htmlData) {
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = htmlData;
                 const linkElement = tempDiv.querySelector('a');
-                if (linkElement && linkElement.textContent && linkElement.textContent.trim() !== url) {
+                if (linkElement && linkElement.textContent && 
+                    linkElement.textContent.trim() !== url && 
+                    !linkElement.textContent.trim().startsWith('http')) {
                     title = linkElement.textContent.trim();
                 }
             }
-            // Third priority: Use plain text if it looks like a title (not a URL)
-            else if (bookmarkName && bookmarkName !== url) {
-                title = bookmarkName.trim();
+            
+            // Second priority: Use Mozilla-specific data formats
+            if (!title && mozText && mozText !== url && !mozText.startsWith('http')) {
+                title = mozText.trim();
+            }
+            
+            // Third priority: Use plain text if it's not a URL
+            if (!title && plainText && plainText !== url && !plainText.startsWith('http')) {
+                title = plainText.trim();
             }
             
             if (url && this.isValidUrl(url)) {
@@ -244,9 +249,9 @@ class BookmarkManager {
     }
 
     async addBookmarkFromDrop(title, url) {
-        // Extract title from URL if not provided or if title is the same as URL
+        // Use the provided bookmark title if available, otherwise extract from URL
         let bookmarkTitle = title;
-        if (!title || title === url) {
+        if (!title || title.trim() === '' || title === url || title.startsWith('http')) {
             try {
                 const hostname = new URL(url).hostname;
                 bookmarkTitle = hostname.replace('www.', '');
