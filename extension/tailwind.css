@@ -492,6 +492,10 @@
     font-size: var(--text-xs);
     line-height: var(--tw-leading, var(--text-xs--line-height));
   }
+  .leading-none {
+    --tw-leading: 1;
+    line-height: 1;
+  }
   .font-bold {
     --tw-font-weight: var(--font-weight-bold);
     font-weight: var(--font-weight-bold);
@@ -506,6 +510,9 @@
   }
   .text-blue-600 {
     color: var(--color-blue-600);
+  }
+  .text-custom-accent {
+    color: var(--color-custom-accent);
   }
   .text-custom-text {
     color: var(--color-custom-text);
@@ -618,6 +625,13 @@
     }
   }
 }
+.plus-icon {
+  font-size: 4rem;
+  line-height: 1;
+  text-align: center;
+  vertical-align: middle;
+  font-family: monospace;
+}
 @property --tw-space-x-reverse {
   syntax: "*";
   inherits: false;
@@ -627,6 +641,10 @@
   syntax: "*";
   inherits: false;
   initial-value: solid;
+}
+@property --tw-leading {
+  syntax: "*";
+  inherits: false;
 }
 @property --tw-font-weight {
   syntax: "*";
@@ -742,6 +760,7 @@
     *, ::before, ::after, ::backdrop {
       --tw-space-x-reverse: 0;
       --tw-border-style: solid;
+      --tw-leading: initial;
       --tw-font-weight: initial;
       --tw-shadow: 0 0 #0000;
       --tw-shadow-color: initial;

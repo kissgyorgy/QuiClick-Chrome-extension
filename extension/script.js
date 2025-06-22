@@ -507,7 +507,7 @@ class BookmarkManager {
     renderQuickAccess() {
         const quickAccessContainer = document.getElementById('quickAccess');
         
-        quickAccessContainer.innerHTML = this.bookmarks.map(bookmark => `
+        const bookmarkTiles = this.bookmarks.map(bookmark => `
             <div class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer" 
                  data-bookmark-id="${bookmark.id}" 
                  draggable="true"
@@ -524,6 +524,17 @@ class BookmarkManager {
                 </div>
             </div>
         `).join('');
+
+        const addButtonTile = `
+            <div id="addBookmarkTile" class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 border-dashed rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer" 
+                 title="Add New Bookmark">
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <span class="text-custom-accent leading-none plus-icon">+</span>
+                </div>
+            </div>
+        `;
+
+        quickAccessContainer.innerHTML = bookmarkTiles + addButtonTile;
         
         // Add event listeners for bookmark clicks and right-clicks
         this.bookmarks.forEach(bookmark => {
@@ -594,6 +605,14 @@ class BookmarkManager {
                 fallbackDiv.style.display = 'block';
             });
         });
+
+        // Add event listener for the add bookmark tile
+        const addBookmarkTile = quickAccessContainer.querySelector('#addBookmarkTile');
+        if (addBookmarkTile) {
+            addBookmarkTile.addEventListener('click', () => {
+                this.showAddBookmarkModal();
+            });
+        }
     }
 
     showDragIndicator(targetElement, event) {
