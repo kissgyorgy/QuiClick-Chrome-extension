@@ -658,7 +658,8 @@ class BookmarkManager {
             dateAdded: new Date().toISOString()
         };
         
-        this.bookmarks.unshift(duplicatedBookmark);
+        const originalIndex = this.bookmarks.findIndex(b => b.id === this.currentBookmarkId);
+        this.bookmarks.splice(originalIndex + 1, 0, duplicatedBookmark);
         await this.saveBookmarks();
         this.renderQuickAccess();
         
