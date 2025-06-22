@@ -155,44 +155,84 @@ class BookmarkManager {
         const hostname = new URL(url).hostname;
         const origin = new URL(url).origin;
         
+        // First try to parse HTML to find declared favicon links
+        try {
+            const response = await fetch(url);
+            if (response.ok) {
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // Look for various favicon declarations in order of preference
+                const faviconSelectors = [
+                    'link[rel*="icon"][sizes*="192"]',
+                    'link[rel*="icon"][sizes*="180"]',
+                    'link[rel*="icon"][sizes*="152"]',
+                    'link[rel*="icon"][sizes*="144"]',
+                    'link[rel*="icon"][sizes*="128"]',
+                    'link[rel*="icon"][sizes*="96"]',
+                    'link[rel*="icon"][sizes*="72"]',
+                    'link[rel*="icon"][sizes*="64"]',
+                    'link[rel*="icon"][sizes*="48"]',
+                    'link[rel*="icon"][sizes*="32"]',
+                    'link[rel="apple-touch-icon"]',
+                    'link[rel="apple-touch-icon-precomposed"]',
+                    'link[rel="icon"]',
+                    'link[rel="shortcut icon"]'
+                ];
+                
+                for (const selector of faviconSelectors) {
+                    const link = doc.querySelector(selector);
+                    if (link && link.href) {
+                        const faviconUrl = new URL(link.href, url).href;
+                        // Test if the favicon actually exists
+                        if (await this.testFaviconUrl(faviconUrl)) {
+                            return faviconUrl;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            // If HTML parsing fails, fall back to hardcoded paths
+        }
+        
+        // Fallback to common favicon paths
         const faviconSources = [
             `${origin}/apple-touch-icon.png`,
             `${origin}/apple-touch-icon-180x180.png`,
             `${origin}/apple-touch-icon-152x152.png`,
             `${origin}/apple-touch-icon-144x144.png`,
             `${origin}/apple-touch-icon-120x120.png`,
-            `${origin}/apple-touch-icon-114x114.png`,
             `${origin}/android-chrome-192x192.png`,
-            `${origin}/android-chrome-512x512.png`,
             `${origin}/favicon-196x196.png`,
             `${origin}/favicon-128x128.png`,
             `${origin}/favicon-96x96.png`,
             `${origin}/favicon-64x64.png`,
-            `${origin}/favicon-48x48.png`,
             `${origin}/favicon-32x32.png`,
-            `${origin}/favicon-16x16.png`,
             `${origin}/favicon.png`,
-            `${origin}/favicon.ico`,
-            `https://www.google.com/s2/favicons?domain=${hostname}&sz=128`,
-            `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`,
-            `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
+            `${origin}/favicon.ico`
         ];
 
         for (const faviconUrl of faviconSources) {
-            try {
-                const response = await fetch(faviconUrl, { 
-                    method: 'HEAD',
-                    mode: 'no-cors'
-                });
-                if (response.ok || response.type === 'opaque') {
-                    return faviconUrl;
-                }
-            } catch (e) {
-                continue;
+            if (await this.testFaviconUrl(faviconUrl)) {
+                return faviconUrl;
             }
         }
         
-        return `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+        // Final fallback to Google favicon service
+        return `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`;
+    }
+
+    async testFaviconUrl(url) {
+        try {
+            const response = await fetch(url, { 
+                method: 'HEAD',
+                mode: 'no-cors'
+            });
+            return response.ok || response.type === 'opaque';
+        } catch (e) {
+            return false;
+        }
     }
 
     async addBookmarkFromDrop(title, url) {
@@ -227,48 +267,36 @@ class BookmarkManager {
     async loadBookmarks() {
         try {
             const result = await chrome.storage.local.get(['bookmarks']);
-            this.bookmarks = result.bookmarks || this.getDefaultBookmarks();
+            this.bookmarks = result.bookmarks || await this.getDefaultBookmarks();
             } catch (error) {
             console.log('Using default bookmarks');
-            this.bookmarks = this.getDefaultBookmarks();
+            this.bookmarks = await this.getDefaultBookmarks();
             }
     }
 
-    getDefaultBookmarks() {
-        return [
-            {
-                id: Date.now() + 1,
-                title: 'Google',
-                url: 'https://www.google.com',
-                category: 'Search',
-                favicon: 'https://www.google.com/s2/favicons?domain=google.com&sz=128',
-                dateAdded: new Date().toISOString()
-            },
-            {
-                id: Date.now() + 2,
-                title: 'GitHub',
-                url: 'https://github.com',
-                category: 'Development',
-                favicon: 'https://github.com/apple-touch-icon.png',
-                dateAdded: new Date().toISOString()
-            },
-            {
-                id: Date.now() + 3,
-                title: 'Stack Overflow',
-                url: 'https://stackoverflow.com',
-                category: 'Development',
-                favicon: 'https://stackoverflow.com/apple-touch-icon.png',
-                dateAdded: new Date().toISOString()
-            },
-            {
-                id: Date.now() + 4,
-                title: 'YouTube',
-                url: 'https://www.youtube.com',
-                category: 'Entertainment',
-                favicon: 'https://www.youtube.com/s/desktop/favicon_144x144.png',
-                dateAdded: new Date().toISOString()
-            }
+    async getDefaultBookmarks() {
+        const defaultUrls = [
+            { title: 'Google', url: 'https://www.google.com', category: 'Search' },
+            { title: 'GitHub', url: 'https://github.com', category: 'Development' },
+            { title: 'Stack Overflow', url: 'https://stackoverflow.com', category: 'Development' },
+            { title: 'YouTube', url: 'https://www.youtube.com', category: 'Entertainment' }
         ];
+
+        const bookmarks = [];
+        for (let i = 0; i < defaultUrls.length; i++) {
+            const { title, url, category } = defaultUrls[i];
+            const favicon = await this.getHighResolutionFavicon(url);
+            bookmarks.push({
+                id: Date.now() + i + 1,
+                title,
+                url,
+                category,
+                favicon,
+                dateAdded: new Date().toISOString()
+            });
+        }
+        
+        return bookmarks;
     }
 
     async saveBookmarks() {
