@@ -133,14 +133,6 @@ class BookmarkManager {
         this.hideAddBookmarkModal();
     }
 
-    async deleteBookmark(id) {
-        if (confirm('Are you sure you want to delete this bookmark?')) {
-            this.bookmarks = this.bookmarks.filter(bookmark => bookmark.id !== id);
-            await this.saveBookmarks();
-            this.filteredBookmarks = [...this.bookmarks];
-            this.renderQuickAccess();
-        }
-    }
 
     searchBookmarks(query) {
         if (!query.trim()) {
@@ -165,35 +157,18 @@ class BookmarkManager {
             <div class="group relative flex flex-col items-center p-3 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 border border-transparent hover:border-gray-200">
                 <a href="${bookmark.url}" class="flex flex-col items-center">
                     <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
-                        <img src="${bookmark.favicon}" alt="" class="w-6 h-6" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        <div class="w-6 h-6 bg-blue-500 rounded flex items-center justify-center text-white text-xs font-bold" style="display: none;">
+                        <img src="${bookmark.favicon}" alt="" class="w-10 h-10 rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                        <div class="w-10 h-10 bg-blue-500 rounded flex items-center justify-center text-white text-lg font-bold" style="display: none;">
                             ${bookmark.title.charAt(0).toUpperCase()}
                         </div>
                     </div>
                     <span class="text-xs text-gray-600 text-center truncate w-full">${bookmark.title}</span>
                 </a>
-                <button data-delete-bookmark="${bookmark.id}" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 w-6 h-6 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all flex items-center justify-center">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
             </div>
         `).join('');
         
-        // Add event listeners for delete buttons
-        this.attachDeleteListeners();
     }
 
-    attachDeleteListeners() {
-        const deleteButtons = document.querySelectorAll('[data-delete-bookmark]');
-        deleteButtons.forEach(button => {
-            button.addEventListener('click', (e) => {
-                e.preventDefault();
-                const bookmarkId = parseInt(button.getAttribute('data-delete-bookmark'));
-                this.deleteBookmark(bookmarkId);
-            });
-        });
-    }
 
     // Removed unused bookmark card and list rendering methods
 }
