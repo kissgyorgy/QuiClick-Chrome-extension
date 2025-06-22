@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "YouTab Bookmarks",
+  "version": "1.0",
+  "description": "Modern bookmark management for new tab pages",
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "permissions": [
+    "storage",
+    "bookmarks",
+    "activeTab"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
