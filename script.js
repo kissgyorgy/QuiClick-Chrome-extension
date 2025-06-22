@@ -426,8 +426,8 @@ class BookmarkManager {
                  data-bookmark-id="${bookmark.id}" 
                  draggable="true">
                 <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-1 group-hover:scale-105 transition-transform">
-                    <img src="${bookmark.favicon}" alt="" class="w-10 h-10 rounded-lg bookmark-favicon">
-                    <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white text-lg font-bold bookmark-fallback" style="display: none;">
+                    <img src="${bookmark.favicon}" alt="" class="w-10 h-10 rounded-lg bookmark-favicon" style="display: ${bookmark.favicon ? 'block' : 'none'};">
+                    <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white text-lg font-bold bookmark-fallback" style="display: ${bookmark.favicon ? 'none' : 'block'};">
                         ${bookmark.title.charAt(0).toUpperCase()}
                     </div>
                 </div>
@@ -707,8 +707,17 @@ class BookmarkManager {
                 const bookmarkElement = document.querySelector(`[data-bookmark-id="${bookmarkId}"]`);
                 if (bookmarkElement) {
                     const faviconImg = bookmarkElement.querySelector('.bookmark-favicon');
-                    if (faviconImg) {
+                    const fallbackDiv = bookmarkElement.querySelector('.bookmark-fallback');
+                    
+                    if (faviconImg && fallbackDiv) {
                         faviconImg.src = faviconUrl;
+                        faviconImg.style.display = 'block';
+                        fallbackDiv.style.display = 'none';
+                        
+                        faviconImg.onerror = () => {
+                            faviconImg.style.display = 'none';
+                            fallbackDiv.style.display = 'block';
+                        };
                     }
                 }
             }
