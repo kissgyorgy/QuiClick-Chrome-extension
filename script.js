@@ -151,6 +151,50 @@ class BookmarkManager {
         }
     }
 
+    async getHighResolutionFavicon(url) {
+        const hostname = new URL(url).hostname;
+        const origin = new URL(url).origin;
+        
+        const faviconSources = [
+            `${origin}/apple-touch-icon.png`,
+            `${origin}/apple-touch-icon-180x180.png`,
+            `${origin}/apple-touch-icon-152x152.png`,
+            `${origin}/apple-touch-icon-144x144.png`,
+            `${origin}/apple-touch-icon-120x120.png`,
+            `${origin}/apple-touch-icon-114x114.png`,
+            `${origin}/android-chrome-192x192.png`,
+            `${origin}/android-chrome-512x512.png`,
+            `${origin}/favicon-196x196.png`,
+            `${origin}/favicon-128x128.png`,
+            `${origin}/favicon-96x96.png`,
+            `${origin}/favicon-64x64.png`,
+            `${origin}/favicon-48x48.png`,
+            `${origin}/favicon-32x32.png`,
+            `${origin}/favicon-16x16.png`,
+            `${origin}/favicon.png`,
+            `${origin}/favicon.ico`,
+            `https://www.google.com/s2/favicons?domain=${hostname}&sz=128`,
+            `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`,
+            `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
+        ];
+
+        for (const faviconUrl of faviconSources) {
+            try {
+                const response = await fetch(faviconUrl, { 
+                    method: 'HEAD',
+                    mode: 'no-cors'
+                });
+                if (response.ok || response.type === 'opaque') {
+                    return faviconUrl;
+                }
+            } catch (e) {
+                continue;
+            }
+        }
+        
+        return `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+    }
+
     async addBookmarkFromDrop(title, url) {
         // Extract title from URL if not provided or if title is the same as URL
         let bookmarkTitle = title;
@@ -164,12 +208,14 @@ class BookmarkManager {
             }
         }
 
+        const faviconUrl = await this.getHighResolutionFavicon(url);
+
         const bookmark = {
             id: Date.now(),
             title: bookmarkTitle,
             url: url,
             category: 'General',
-            favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=32`,
+            favicon: faviconUrl,
             dateAdded: new Date().toISOString()
         };
 
@@ -195,7 +241,7 @@ class BookmarkManager {
                 title: 'Google',
                 url: 'https://www.google.com',
                 category: 'Search',
-                favicon: 'https://www.google.com/favicon.ico',
+                favicon: 'https://www.google.com/s2/favicons?domain=google.com&sz=128',
                 dateAdded: new Date().toISOString()
             },
             {
@@ -203,7 +249,7 @@ class BookmarkManager {
                 title: 'GitHub',
                 url: 'https://github.com',
                 category: 'Development',
-                favicon: 'https://github.com/favicon.ico',
+                favicon: 'https://github.com/apple-touch-icon.png',
                 dateAdded: new Date().toISOString()
             },
             {
@@ -211,7 +257,7 @@ class BookmarkManager {
                 title: 'Stack Overflow',
                 url: 'https://stackoverflow.com',
                 category: 'Development',
-                favicon: 'https://stackoverflow.com/favicon.ico',
+                favicon: 'https://stackoverflow.com/apple-touch-icon.png',
                 dateAdded: new Date().toISOString()
             },
             {
@@ -219,7 +265,7 @@ class BookmarkManager {
                 title: 'YouTube',
                 url: 'https://www.youtube.com',
                 category: 'Entertainment',
-                favicon: 'https://www.youtube.com/favicon.ico',
+                favicon: 'https://www.youtube.com/s/desktop/favicon_144x144.png',
                 dateAdded: new Date().toISOString()
             }
         ];
@@ -250,12 +296,14 @@ class BookmarkManager {
 
         if (!title || !url) return;
 
+        const faviconUrl = await this.getHighResolutionFavicon(url);
+
         const bookmark = {
             id: Date.now(),
             title,
             url,
             category,
-            favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=32`,
+            favicon: faviconUrl,
             dateAdded: new Date().toISOString()
         };
 
@@ -361,12 +409,14 @@ class BookmarkManager {
         const bookmarkIndex = this.bookmarks.findIndex(b => b.id === this.currentBookmarkId);
         if (bookmarkIndex === -1) return;
 
+        const faviconUrl = await this.getHighResolutionFavicon(url);
+
         this.bookmarks[bookmarkIndex] = {
             ...this.bookmarks[bookmarkIndex],
             title,
             url,
             category,
-            favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=32`
+            favicon: faviconUrl
         };
 
         await this.saveBookmarks();
