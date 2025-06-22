@@ -107,3 +107,7 @@ Uses Google's favicon service with fallback to letter-based avatars when images 
 - `tailwind.css` - Compiled CSS output (auto-generated)
 - `manifest.json` - Chrome extension configuration
 - `package.json` - Bun project configuration with CSS build script
+
+## UI/UX Guidelines
+
+- Always set cursor pointer on every button
