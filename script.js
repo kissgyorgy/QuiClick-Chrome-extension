@@ -94,10 +94,6 @@ class BookmarkManager {
         // Handle drag over the entire page
         body.addEventListener('dragover', (e) => {
             e.preventDefault();
-            const main = document.querySelector('main');
-            if (main) {
-                main.classList.add('bg-blue-50');
-            }
             // Add a visual overlay to indicate drop zone (excluding header)
             if (!document.getElementById('dropOverlay')) {
                 const header = document.querySelector('header');
@@ -105,7 +101,7 @@ class BookmarkManager {
                 
                 const overlay = document.createElement('div');
                 overlay.id = 'dropOverlay';
-                overlay.className = 'fixed left-0 right-0 bottom-0 bg-blue-100 bg-opacity-30 border-4 border-dashed border-blue-400 z-40 flex items-center justify-center';
+                overlay.className = 'fixed left-0 right-0 bottom-0 bg-blue-100 bg-opacity-20 border-4 border-dashed border-blue-400 z-40 flex items-center justify-center';
                 overlay.style.top = `${headerHeight}px`; // Start exactly at bottom of header
                 overlay.innerHTML = '<div class="text-blue-600 text-xl font-semibold">Drop bookmark here</div>';
                 body.appendChild(overlay);
@@ -116,10 +112,6 @@ class BookmarkManager {
         body.addEventListener('dragleave', (e) => {
             // Only remove overlay if we're actually leaving the body
             if (e.target === body) {
-                const main = document.querySelector('main');
-                if (main) {
-                    main.classList.remove('bg-blue-50');
-                }
                 const overlay = document.getElementById('dropOverlay');
                 if (overlay) {
                     overlay.remove();
@@ -130,10 +122,6 @@ class BookmarkManager {
         // Handle drop on entire page
         body.addEventListener('drop', (e) => {
             e.preventDefault();
-            const main = document.querySelector('main');
-            if (main) {
-                main.classList.remove('bg-blue-50');
-            }
             const overlay = document.getElementById('dropOverlay');
             if (overlay) {
                 overlay.remove();
