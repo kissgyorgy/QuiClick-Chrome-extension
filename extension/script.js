@@ -1,6 +1,7 @@
 class BookmarkManager {
     constructor() {
         this.bookmarks = [];
+        this.currentBookmarkId = null;
         this.init();
     }
 
@@ -35,6 +36,45 @@ class BookmarkManager {
             if (e.target.id === 'addBookmarkModal') {
                 this.hideAddBookmarkModal();
             }
+        });
+
+        // Edit bookmark modal events
+        document.getElementById('cancelEditBtn').addEventListener('click', () => {
+            this.hideEditBookmarkModal();
+        });
+
+        document.getElementById('editBookmarkForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.updateBookmark();
+        });
+
+        document.getElementById('editBookmarkModal').addEventListener('click', (e) => {
+            if (e.target.id === 'editBookmarkModal') {
+                this.hideEditBookmarkModal();
+            }
+        });
+
+        // Context menu events
+        document.getElementById('editBookmark').addEventListener('click', () => {
+            this.showEditBookmarkModal();
+            this.hideContextMenu();
+        });
+
+        document.getElementById('deleteBookmark').addEventListener('click', () => {
+            this.deleteBookmark();
+            this.hideContextMenu();
+        });
+
+        // Hide context menu when clicking elsewhere
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#contextMenu')) {
+                this.hideContextMenu();
+            }
+        });
+
+        // Prevent default context menu
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
         });
     }
 
@@ -133,7 +173,7 @@ class BookmarkManager {
         const quickAccessContainer = document.getElementById('quickAccess');
         
         quickAccessContainer.innerHTML = this.bookmarks.map(bookmark => `
-            <a href="${bookmark.url}" class="group relative flex flex-col items-center p-3 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 border border-transparent hover:border-gray-200 cursor-pointer">
+            <div class="group relative flex flex-col items-center p-3 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 border border-transparent hover:border-gray-200 cursor-pointer" data-bookmark-id="${bookmark.id}">
                 <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
                     <img src="${bookmark.favicon}" alt="" class="w-10 h-10 rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                     <div class="w-10 h-10 bg-blue-500 rounded flex items-center justify-center text-white text-lg font-bold" style="display: none;">
@@ -141,11 +181,108 @@ class BookmarkManager {
                     </div>
                 </div>
                 <span class="text-xs text-gray-600 text-center truncate w-full">${bookmark.title}</span>
-            </a>
+            </div>
         `).join('');
         
+        // Add event listeners for bookmark clicks and right-clicks
+        this.bookmarks.forEach(bookmark => {
+            const bookmarkElement = quickAccessContainer.querySelector(`[data-bookmark-id="${bookmark.id}"]`);
+            
+            // Left click - navigate to URL
+            bookmarkElement.addEventListener('click', (e) => {
+                if (e.button === 0) { // Left click
+                    window.open(bookmark.url, '_blank');
+                }
+            });
+            
+            // Right click - show context menu
+            bookmarkElement.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.showContextMenu(e, bookmark.id);
+            });
+        });
     }
 
+
+    showContextMenu(event, bookmarkId) {
+        this.currentBookmarkId = bookmarkId;
+        const contextMenu = document.getElementById('contextMenu');
+        
+        contextMenu.style.left = `${event.pageX}px`;
+        contextMenu.style.top = `${event.pageY}px`;
+        contextMenu.classList.remove('hidden');
+        
+        // Adjust position if menu goes off screen
+        const rect = contextMenu.getBoundingClientRect();
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        
+        if (rect.right > windowWidth) {
+            contextMenu.style.left = `${event.pageX - rect.width}px`;
+        }
+        if (rect.bottom > windowHeight) {
+            contextMenu.style.top = `${event.pageY - rect.height}px`;
+        }
+    }
+
+    hideContextMenu() {
+        document.getElementById('contextMenu').classList.add('hidden');
+        this.currentBookmarkId = null;
+    }
+
+    showEditBookmarkModal() {
+        const bookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
+        if (!bookmark) return;
+        
+        const modal = document.getElementById('editBookmarkModal');
+        document.getElementById('editBookmarkTitle').value = bookmark.title;
+        document.getElementById('editBookmarkUrl').value = bookmark.url;
+        document.getElementById('editBookmarkCategory').value = bookmark.category || '';
+        
+        modal.classList.remove('hidden');
+        document.getElementById('editBookmarkTitle').focus();
+    }
+
+    hideEditBookmarkModal() {
+        document.getElementById('editBookmarkModal').classList.add('hidden');
+        document.getElementById('editBookmarkForm').reset();
+        this.currentBookmarkId = null;
+    }
+
+    async updateBookmark() {
+        if (!this.currentBookmarkId) return;
+        
+        const title = document.getElementById('editBookmarkTitle').value.trim();
+        const url = document.getElementById('editBookmarkUrl').value.trim();
+        const category = document.getElementById('editBookmarkCategory').value.trim() || 'General';
+
+        if (!title || !url) return;
+
+        const bookmarkIndex = this.bookmarks.findIndex(b => b.id === this.currentBookmarkId);
+        if (bookmarkIndex === -1) return;
+
+        this.bookmarks[bookmarkIndex] = {
+            ...this.bookmarks[bookmarkIndex],
+            title,
+            url,
+            category,
+            favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=32`
+        };
+
+        await this.saveBookmarks();
+        this.renderQuickAccess();
+        this.hideEditBookmarkModal();
+    }
+
+    async deleteBookmark() {
+        if (!this.currentBookmarkId) return;
+        
+        if (confirm('Are you sure you want to delete this bookmark?')) {
+            this.bookmarks = this.bookmarks.filter(b => b.id !== this.currentBookmarkId);
+            await this.saveBookmarks();
+            this.renderQuickAccess();
+        }
+    }
 
     // Removed unused bookmark card and list rendering methods
 }
