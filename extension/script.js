@@ -64,6 +64,8 @@ class BookmarkManager {
         document.addEventListener('click', (e) => {
             if (!e.target.closest('#contextMenu')) {
                 this.hideContextMenu();
+                // Clear currentBookmarkId when context menu is dismissed by clicking elsewhere
+                this.currentBookmarkId = null;
             }
         });
 
@@ -437,7 +439,7 @@ class BookmarkManager {
 
     hideContextMenu() {
         document.getElementById('contextMenu').classList.add('hidden');
-        this.currentBookmarkId = null;
+        // Don't clear currentBookmarkId here as it's needed for edit/delete operations
     }
 
     showEditBookmarkModal() {
