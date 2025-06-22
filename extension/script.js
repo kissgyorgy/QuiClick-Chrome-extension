@@ -100,10 +100,13 @@ class BookmarkManager {
             }
             // Add a visual overlay to indicate drop zone (excluding header)
             if (!document.getElementById('dropOverlay')) {
+                const header = document.querySelector('header');
+                const headerHeight = header ? header.offsetHeight : 0;
+                
                 const overlay = document.createElement('div');
                 overlay.id = 'dropOverlay';
-                overlay.className = 'fixed top-0 left-0 right-0 bottom-0 bg-blue-100 bg-opacity-30 border-4 border-dashed border-blue-400 z-40 flex items-center justify-center';
-                overlay.style.top = 'var(--header-height)'; // Start below header
+                overlay.className = 'fixed left-0 right-0 bottom-0 bg-blue-100 bg-opacity-30 border-4 border-dashed border-blue-400 z-40 flex items-center justify-center';
+                overlay.style.top = `${headerHeight}px`; // Start exactly at bottom of header
                 overlay.innerHTML = '<div class="text-blue-600 text-xl font-semibold">Drop bookmark here</div>';
                 body.appendChild(overlay);
             }
