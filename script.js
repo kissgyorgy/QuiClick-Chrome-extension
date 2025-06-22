@@ -104,7 +104,7 @@ class BookmarkManager {
                 
                 const overlay = document.createElement('div');
                 overlay.id = 'dropOverlay';
-                overlay.className = 'fixed left-0 right-0 bottom-0 bg-blue-100/10 border-4 border-dashed border-blue-400 z-40 flex items-center justify-center';
+                overlay.className = 'fixed left-0 right-0 bottom-0 bg-blue-100/10 backdrop-blur-sm border-4 border-dashed border-blue-400 z-40 flex items-center justify-center';
                 overlay.style.top = `${headerHeight}px`; // Start exactly at bottom of header
                 overlay.innerHTML = '<div class="text-blue-600 text-xl font-semibold">Drop bookmark here</div>';
                 body.appendChild(overlay);
