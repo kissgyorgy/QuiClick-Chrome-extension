@@ -434,6 +434,14 @@ class BookmarkManager {
                 }
             });
             
+            // Middle click - open in new tab
+            bookmarkElement.addEventListener('mousedown', (e) => {
+                if (e.button === 1 && !this.isDragging) { // Middle click and not dragging
+                    e.preventDefault();
+                    chrome.tabs.create({ url: bookmark.url });
+                }
+            });
+            
             // Right click - show context menu
             bookmarkElement.addEventListener('contextmenu', (e) => {
                 e.preventDefault();

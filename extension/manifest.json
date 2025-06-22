@@ -9,7 +9,8 @@
   "permissions": [
     "storage",
     "bookmarks",
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "http://*/*",
