@@ -77,7 +77,7 @@ class BookmarkManager {
     }
 
     setupDragAndDrop() {
-        const quickAccessContainer = document.getElementById('quickAccess');
+        const body = document.body;
         
         // Prevent default drag behaviors on document
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -87,23 +87,40 @@ class BookmarkManager {
             }, false);
         });
 
-        // Handle drag over the container
-        quickAccessContainer.addEventListener('dragover', (e) => {
+        // Handle drag over the entire page
+        body.addEventListener('dragover', (e) => {
             e.preventDefault();
-            quickAccessContainer.classList.add('bg-blue-50', 'border-2', 'border-dashed', 'border-blue-300');
-        });
-
-        // Handle drag leave
-        quickAccessContainer.addEventListener('dragleave', (e) => {
-            if (!quickAccessContainer.contains(e.relatedTarget)) {
-                quickAccessContainer.classList.remove('bg-blue-50', 'border-2', 'border-dashed', 'border-blue-300');
+            body.classList.add('bg-blue-50');
+            // Add a visual overlay to indicate drop zone
+            if (!document.getElementById('dropOverlay')) {
+                const overlay = document.createElement('div');
+                overlay.id = 'dropOverlay';
+                overlay.className = 'fixed inset-0 bg-blue-100 bg-opacity-30 border-4 border-dashed border-blue-400 z-40 flex items-center justify-center';
+                overlay.innerHTML = '<div class="text-blue-600 text-xl font-semibold">Drop bookmark here</div>';
+                body.appendChild(overlay);
             }
         });
 
-        // Handle drop
-        quickAccessContainer.addEventListener('drop', (e) => {
+        // Handle drag leave
+        body.addEventListener('dragleave', (e) => {
+            // Only remove overlay if we're actually leaving the body
+            if (e.target === body) {
+                body.classList.remove('bg-blue-50');
+                const overlay = document.getElementById('dropOverlay');
+                if (overlay) {
+                    overlay.remove();
+                }
+            }
+        });
+
+        // Handle drop on entire page
+        body.addEventListener('drop', (e) => {
             e.preventDefault();
-            quickAccessContainer.classList.remove('bg-blue-50', 'border-2', 'border-dashed', 'border-blue-300');
+            body.classList.remove('bg-blue-50');
+            const overlay = document.getElementById('dropOverlay');
+            if (overlay) {
+                overlay.remove();
+            }
             
             // Get the dragged data - Chrome bookmarks provide multiple data formats
             const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
