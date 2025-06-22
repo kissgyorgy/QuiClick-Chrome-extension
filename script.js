@@ -116,24 +116,32 @@ class BookmarkManager {
             // Try to get the bookmark title from different data types
             let title = '';
             
-            // Chrome bookmarks provide the title in 'text/x-moz-text-internal' or 'text/plain'
-            // When dragging from bookmark bar, the title is usually in text/plain when it's different from URL
-            const plainText = e.dataTransfer.getData('text/plain');
+            // Debug: log all available data types
+            console.log('Available data types:', e.dataTransfer.types);
+            
+            // Try various data formats to get the bookmark name
+            const bookmarkName = e.dataTransfer.getData('text/x-moz-text-internal') || 
+                                e.dataTransfer.getData('application/x-moz-nativehtml') ||
+                                e.dataTransfer.getData('text/plain');
+            
             const htmlData = e.dataTransfer.getData('text/html');
             
-            // If HTML data is available, try to extract title from it
-            if (htmlData) {
+            // First priority: Use bookmark name if it's different from URL
+            if (bookmarkName && bookmarkName !== url && !bookmarkName.startsWith('http')) {
+                title = bookmarkName.trim();
+            }
+            // Second priority: Extract title from HTML data
+            else if (htmlData) {
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = htmlData;
                 const linkElement = tempDiv.querySelector('a');
-                if (linkElement && linkElement.textContent) {
+                if (linkElement && linkElement.textContent && linkElement.textContent.trim() !== url) {
                     title = linkElement.textContent.trim();
                 }
             }
-            
-            // If no title from HTML, use plain text if it's different from URL
-            if (!title && plainText && plainText !== url) {
-                title = plainText;
+            // Third priority: Use plain text if it looks like a title (not a URL)
+            else if (bookmarkName && bookmarkName !== url) {
+                title = bookmarkName.trim();
             }
             
             if (url && this.isValidUrl(url)) {
