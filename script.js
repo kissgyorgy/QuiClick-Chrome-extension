@@ -497,16 +497,20 @@ class BookmarkManager {
         const quickAccessContainer = document.getElementById('quickAccess');
         
         quickAccessContainer.innerHTML = this.bookmarks.map(bookmark => `
-            <div class="group relative flex flex-col items-center rounded-xl hover:shadow-md transition-all duration-200 cursor-pointer pb-2" 
+            <div class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer" 
                  data-bookmark-id="${bookmark.id}" 
-                 draggable="true">
-                <div class="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center mb-1 group-hover:scale-105 transition-transform">
-                    <img src="${bookmark.favicon}" alt="" class="w-14 h-14 rounded-lg bookmark-favicon" style="display: ${bookmark.favicon ? 'block' : 'none'};">
-                    <div class="w-14 h-14 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xl font-bold bookmark-fallback" style="display: ${bookmark.favicon ? 'none' : 'block'};">
+                 draggable="true"
+                 title="${bookmark.title}">
+                <a draggable="false" href="${bookmark.url}" aria-label="${bookmark.title}" class="absolute inset-0"></a>
+                <div class="tile-icon absolute inset-0 flex items-center justify-center">
+                    <img draggable="false" alt="" src="${bookmark.favicon}" class="w-6 h-6 bookmark-favicon" style="display: ${bookmark.favicon ? 'block' : 'none'};">
+                    <div class="w-6 h-6 bg-blue-500 rounded flex items-center justify-center text-white text-sm font-bold bookmark-fallback" style="display: ${bookmark.favicon ? 'none' : 'block'};">
                         ${bookmark.title.charAt(0).toUpperCase()}
                     </div>
                 </div>
-                <span class="text-xs text-gray-600 text-center truncate w-full">${bookmark.title}</span>
+                <div class="tile-title absolute bottom-1 left-1 right-1">
+                    <span class="text-xs text-gray-800 text-center block truncate">${bookmark.title}</span>
+                </div>
             </div>
         `).join('');
         
