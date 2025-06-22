@@ -31,13 +31,6 @@ class BookmarkManager {
 
         // Remove view toggle listeners since we only have favicon view now
 
-        // Modal close on backdrop click
-        document.getElementById('addBookmarkModal').addEventListener('click', (e) => {
-            if (e.target.id === 'addBookmarkModal') {
-                this.hideAddBookmarkModal();
-            }
-        });
-
         // Edit bookmark modal events
         document.getElementById('cancelEditBtn').addEventListener('click', () => {
             this.hideEditBookmarkModal();
@@ -48,8 +41,10 @@ class BookmarkManager {
             this.updateBookmark();
         });
 
-        document.getElementById('editBookmarkModal').addEventListener('click', (e) => {
-            if (e.target.id === 'editBookmarkModal') {
+        // ESC key to close modals
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.hideAddBookmarkModal();
                 this.hideEditBookmarkModal();
             }
         });
