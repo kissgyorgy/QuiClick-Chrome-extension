@@ -1,0 +1,15 @@
+{
+  "name": "newtab-bookmarks",
+  "private": true,
+  "scripts": {
+    "build-css": "tailwindcss -i ./src/main.css -o ./tailwind.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.10",
+    "@types/bun": "latest",
+    "tailwindcss": "^4.0.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
