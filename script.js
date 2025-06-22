@@ -415,7 +415,6 @@ class BookmarkManager {
             id: Date.now(),
             title: bookmarkTitle,
             url: url,
-            category: 'General',
             favicon: '',
             dateAdded: new Date().toISOString()
         };
@@ -439,21 +438,20 @@ class BookmarkManager {
 
     async getDefaultBookmarks() {
         const defaultUrls = [
-            { title: 'Google', url: 'https://www.google.com', category: 'Search' },
-            { title: 'GitHub', url: 'https://github.com', category: 'Development' },
-            { title: 'Stack Overflow', url: 'https://stackoverflow.com', category: 'Development' },
-            { title: 'YouTube', url: 'https://www.youtube.com', category: 'Entertainment' }
+            { title: 'Google', url: 'https://www.google.com' },
+            { title: 'GitHub', url: 'https://github.com' },
+            { title: 'Stack Overflow', url: 'https://stackoverflow.com' },
+            { title: 'YouTube', url: 'https://www.youtube.com' }
         ];
 
         const bookmarks = [];
         for (let i = 0; i < defaultUrls.length; i++) {
-            const { title, url, category } = defaultUrls[i];
+            const { title, url } = defaultUrls[i];
             const favicon = await this.getHighResolutionFavicon(url);
             bookmarks.push({
                 id: Date.now() + i + 1,
                 title,
                 url,
-                category,
                 favicon,
                 dateAdded: new Date().toISOString()
             });
@@ -483,7 +481,6 @@ class BookmarkManager {
     async addBookmark() {
         const title = document.getElementById('bookmarkTitle').value.trim();
         const url = document.getElementById('bookmarkUrl').value.trim();
-        const category = document.getElementById('bookmarkCategory').value.trim() || 'General';
 
         if (!title || !url) return;
 
@@ -491,7 +488,6 @@ class BookmarkManager {
             id: Date.now(),
             title,
             url,
-            category,
             favicon: '',
             dateAdded: new Date().toISOString()
         };
@@ -702,7 +698,6 @@ class BookmarkManager {
         
         document.getElementById('editBookmarkTitle').value = bookmark.title;
         document.getElementById('editBookmarkUrl').value = bookmark.url;
-        document.getElementById('editBookmarkCategory').value = bookmark.category || '';
         
         modal.classList.remove('hidden');
         document.getElementById('editBookmarkTitle').focus();
@@ -723,7 +718,6 @@ class BookmarkManager {
         
         document.getElementById('editBookmarkTitle').value = bookmark.title;
         document.getElementById('editBookmarkUrl').value = bookmark.url;
-        document.getElementById('editBookmarkCategory').value = bookmark.category || '';
         
         modal.classList.remove('hidden');
         document.getElementById('editBookmarkTitle').focus();
@@ -757,9 +751,8 @@ class BookmarkManager {
         
         const title = document.getElementById('editBookmarkTitle').value.trim();
         const url = document.getElementById('editBookmarkUrl').value.trim();
-        const category = document.getElementById('editBookmarkCategory').value.trim() || 'General';
 
-        console.log('Form values:', { title, url, category });
+        console.log('Form values:', { title, url });
 
         if (!title || !url) {
             console.log('Missing title or url, exiting');
@@ -780,8 +773,7 @@ class BookmarkManager {
         this.bookmarks[bookmarkIndex] = {
             ...this.bookmarks[bookmarkIndex],
             title,
-            url,
-            category
+            url
         };
 
         console.log('Saving bookmarks...');
