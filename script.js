@@ -95,8 +95,83 @@ class BookmarkManager {
             e.preventDefault();
         });
 
+        // Paste functionality for adding bookmarks
+        this.setupPasteListener();
+
         // Drag and drop functionality
         this.setupDragAndDrop();
+    }
+
+    setupPasteListener() {
+        document.addEventListener('paste', async (e) => {
+            // Don't interfere if user is pasting into an input field
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            e.preventDefault();
+            
+            try {
+                const clipboardText = await navigator.clipboard.readText();
+                await this.handlePastedContent(clipboardText);
+            } catch (error) {
+                console.log('Could not read clipboard:', error);
+                // Fallback to event clipboardData if clipboard API fails
+                const clipboardText = e.clipboardData?.getData('text/plain');
+                if (clipboardText) {
+                    await this.handlePastedContent(clipboardText);
+                }
+            }
+        });
+    }
+
+    async handlePastedContent(content) {
+        if (!content || !content.trim()) return;
+
+        // Check if the content is a valid URL
+        if (this.isValidUrl(content.trim())) {
+            const url = content.trim();
+            let title = '';
+
+            // Try to extract title from URL
+            try {
+                const hostname = new URL(url).hostname;
+                title = hostname.replace('www.', '');
+                title = title.charAt(0).toUpperCase() + title.slice(1);
+            } catch (e) {
+                title = 'Bookmark';
+            }
+
+            // Show the add bookmark modal with pre-filled URL
+            this.showAddBookmarkModal();
+            document.getElementById('bookmarkUrl').value = url;
+            document.getElementById('bookmarkTitle').value = title;
+            document.getElementById('bookmarkTitle').focus();
+            document.getElementById('bookmarkTitle').select();
+        } else {
+            // Check if content contains a URL within text (like "Check out https://example.com")
+            const urlMatch = content.match(/(https?:\/\/[^\s]+)/i);
+            if (urlMatch) {
+                const url = urlMatch[1];
+                const title = content.replace(urlMatch[0], '').trim() || this.extractTitleFromUrl(url);
+                
+                this.showAddBookmarkModal();
+                document.getElementById('bookmarkUrl').value = url;
+                document.getElementById('bookmarkTitle').value = title;
+                document.getElementById('bookmarkTitle').focus();
+                document.getElementById('bookmarkTitle').select();
+            }
+        }
+    }
+
+    extractTitleFromUrl(url) {
+        try {
+            const hostname = new URL(url).hostname;
+            let title = hostname.replace('www.', '');
+            return title.charAt(0).toUpperCase() + title.slice(1);
+        } catch (e) {
+            return 'Bookmark';
+        }
     }
 
     setupDragAndDrop() {
