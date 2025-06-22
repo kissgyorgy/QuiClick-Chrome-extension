@@ -396,7 +396,7 @@ class BookmarkManager {
             // Left click - navigate to URL
             bookmarkElement.addEventListener('click', (e) => {
                 if (e.button === 0) { // Left click
-                    window.open(bookmark.url, '_blank');
+                    window.location.href = bookmark.url;
                 }
             });
             
