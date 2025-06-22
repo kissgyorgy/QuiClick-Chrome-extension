@@ -58,6 +58,11 @@ class BookmarkManager {
             this.hideContextMenu();
         });
 
+        document.getElementById('duplicateBookmark').addEventListener('click', () => {
+            this.duplicateBookmark();
+            this.hideContextMenu();
+        });
+
         document.getElementById('deleteBookmark').addEventListener('click', () => {
             this.deleteBookmark();
             this.hideContextMenu();
@@ -638,6 +643,33 @@ class BookmarkManager {
         console.log('Hiding modal...');
         this.hideEditBookmarkModal();
         console.log('Update complete');
+    }
+
+    async duplicateBookmark() {
+        if (!this.currentBookmarkId) return;
+        
+        const bookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
+        if (!bookmark) return;
+        
+        const duplicatedBookmark = {
+            ...bookmark,
+            id: Date.now(),
+            title: bookmark.title,
+            dateAdded: new Date().toISOString()
+        };
+        
+        this.bookmarks.unshift(duplicatedBookmark);
+        await this.saveBookmarks();
+        this.renderQuickAccess();
+        
+        this.currentBookmarkId = duplicatedBookmark.id;
+        this.showEditBookmarkModal();
+        
+        setTimeout(() => {
+            const titleInput = document.getElementById('editBookmarkTitle');
+            titleInput.focus();
+            titleInput.select();
+        }, 100);
     }
 
     async deleteBookmark() {
