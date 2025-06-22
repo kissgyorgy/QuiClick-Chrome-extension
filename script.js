@@ -82,6 +82,7 @@ class BookmarkManager {
 
     setupDragAndDrop() {
         const body = document.body;
+        let dragCounter = 0;
         
         // Prevent default drag behaviors on document
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -91,9 +92,11 @@ class BookmarkManager {
             }, false);
         });
 
-        // Handle drag over the entire page
-        body.addEventListener('dragover', (e) => {
+        // Handle drag enter
+        body.addEventListener('dragenter', (e) => {
             e.preventDefault();
+            dragCounter++;
+            
             // Add a visual overlay to indicate drop zone (excluding header)
             if (!document.getElementById('dropOverlay')) {
                 const header = document.querySelector('header');
@@ -108,10 +111,18 @@ class BookmarkManager {
             }
         });
 
+        // Handle drag over (required for drop to work)
+        body.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
         // Handle drag leave
         body.addEventListener('dragleave', (e) => {
-            // Only remove overlay if we're actually leaving the body
-            if (e.target === body) {
+            e.preventDefault();
+            dragCounter--;
+            
+            // Only remove overlay when all drag operations are done
+            if (dragCounter === 0) {
                 const overlay = document.getElementById('dropOverlay');
                 if (overlay) {
                     overlay.remove();
@@ -122,6 +133,7 @@ class BookmarkManager {
         // Handle drop on entire page
         body.addEventListener('drop', (e) => {
             e.preventDefault();
+            dragCounter = 0; // Reset counter on drop
             const overlay = document.getElementById('dropOverlay');
             if (overlay) {
                 overlay.remove();
