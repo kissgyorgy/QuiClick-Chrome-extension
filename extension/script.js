@@ -49,6 +49,7 @@ class BookmarkManager {
             if (e.key === 'Escape') {
                 this.hideAddBookmarkModal();
                 this.hideEditBookmarkModal();
+                this.hideDeleteConfirmation();
             }
         });
 
@@ -63,15 +64,26 @@ class BookmarkManager {
             this.hideContextMenu();
         });
 
-        document.getElementById('deleteBookmark').addEventListener('click', () => {
-            this.deleteBookmark();
+        document.getElementById('deleteBookmark').addEventListener('click', (e) => {
+            this.showDeleteConfirmation(e);
             this.hideContextMenu();
+        });
+
+        // Delete confirmation popup events
+        document.getElementById('cancelDeleteBtn').addEventListener('click', () => {
+            this.hideDeleteConfirmation();
+        });
+
+        document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
+            this.confirmDeleteBookmark();
+            this.hideDeleteConfirmation();
         });
 
         // Hide context menu when clicking elsewhere
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('#contextMenu') && !e.target.closest('#editBookmarkModal')) {
+            if (!e.target.closest('#contextMenu') && !e.target.closest('#editBookmarkModal') && !e.target.closest('#deleteConfirmPopup')) {
                 this.hideContextMenu();
+                this.hideDeleteConfirmation();
                 // Clear currentBookmarkId when context menu is dismissed by clicking elsewhere
                 console.log('Clearing currentBookmarkId due to click outside');
                 this.currentBookmarkId = null;
@@ -681,7 +693,62 @@ class BookmarkManager {
         }, 100);
     }
 
+    showDeleteConfirmation(event) {
+        if (!this.currentBookmarkId) return;
+        
+        const popup = document.getElementById('deleteConfirmPopup');
+        const bookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
+        
+        if (!bookmark) return;
+        
+        // Position the popup near the bookmark being deleted
+        const bookmarkElement = document.querySelector(`[data-bookmark-id="${this.currentBookmarkId}"]`);
+        if (bookmarkElement) {
+            const rect = bookmarkElement.getBoundingClientRect();
+            const popupRect = popup.getBoundingClientRect();
+            
+            // Position popup to the right of the bookmark, or left if not enough space
+            let left = rect.right + 10;
+            let top = rect.top;
+            
+            // Check if popup would go off screen horizontally
+            if (left + 256 > window.innerWidth) { // 256px is popup width (w-64)
+                left = rect.left - 256 - 10;
+            }
+            
+            // Check if popup would go off screen vertically
+            if (top + 100 > window.innerHeight) { // Approximate popup height
+                top = rect.bottom - 100;
+            }
+            
+            // Ensure popup doesn't go above viewport
+            if (top < 0) {
+                top = 10;
+            }
+            
+            popup.style.left = `${left}px`;
+            popup.style.top = `${top}px`;
+        }
+        
+        popup.classList.remove('hidden');
+    }
+    
+    hideDeleteConfirmation() {
+        document.getElementById('deleteConfirmPopup').classList.add('hidden');
+    }
+    
+    async confirmDeleteBookmark() {
+        if (!this.currentBookmarkId) return;
+        
+        this.bookmarks = this.bookmarks.filter(b => b.id !== this.currentBookmarkId);
+        await this.saveBookmarks();
+        this.renderQuickAccess();
+        this.currentBookmarkId = null;
+    }
+
     async deleteBookmark() {
+        // This method is now deprecated in favor of showDeleteConfirmation
+        // Keeping for backward compatibility but it won't be used
         if (!this.currentBookmarkId) return;
         
         if (confirm('Are you sure you want to delete this bookmark?')) {
