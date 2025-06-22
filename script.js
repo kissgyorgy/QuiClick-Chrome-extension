@@ -323,8 +323,8 @@ class BookmarkManager {
         quickAccessContainer.innerHTML = this.bookmarks.map(bookmark => `
             <div class="group relative flex flex-col items-center p-3 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 border border-transparent hover:border-gray-200 cursor-pointer" data-bookmark-id="${bookmark.id}">
                 <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
-                    <img src="${bookmark.favicon}" alt="" class="w-10 h-10 rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                    <div class="w-10 h-10 bg-blue-500 rounded flex items-center justify-center text-white text-lg font-bold" style="display: none;">
+                    <img src="${bookmark.favicon}" alt="" class="w-10 h-10 rounded bookmark-favicon">
+                    <div class="w-10 h-10 bg-blue-500 rounded flex items-center justify-center text-white text-lg font-bold bookmark-fallback" style="display: none;">
                         ${bookmark.title.charAt(0).toUpperCase()}
                     </div>
                 </div>
@@ -347,6 +347,15 @@ class BookmarkManager {
             bookmarkElement.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 this.showContextMenu(e, bookmark.id);
+            });
+
+            // Handle favicon error - show fallback
+            const faviconImg = bookmarkElement.querySelector('.bookmark-favicon');
+            const fallbackDiv = bookmarkElement.querySelector('.bookmark-fallback');
+            
+            faviconImg.addEventListener('error', () => {
+                faviconImg.style.display = 'none';
+                fallbackDiv.style.display = 'block';
             });
         });
     }
