@@ -661,10 +661,14 @@ class BookmarkManager {
         const currentSelected = document.querySelector('.favicon-option.selected');
         if (currentSelected) {
             currentSelected.classList.remove('selected', 'border-blue-500', 'bg-blue-50');
+            currentSelected.classList.add('border-gray-300', 'bg-white');
+            currentSelected.style.borderWidth = '1px';
         }
         
         // Add selection to new element
+        element.classList.remove('border-gray-300', 'bg-white');
         element.classList.add('selected', 'border-blue-500', 'bg-blue-50');
+        element.style.borderWidth = '2px';
         this.selectedFavicon = url;
     }
 
