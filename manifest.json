@@ -13,7 +13,6 @@
     "tabs"
   ],
   "host_permissions": [
-    "http://*/*",
     "https://*/*"
   ],
   "content_security_policy": {
