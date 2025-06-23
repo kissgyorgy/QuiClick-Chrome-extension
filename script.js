@@ -721,6 +721,9 @@ class BookmarkManager {
         document.getElementById('editBookmarkTitle').value = bookmark.title;
         document.getElementById('editBookmarkUrl').value = bookmark.url;
         
+        // Position the modal near the bookmark being edited
+        this.positionEditModal(modal);
+        
         modal.classList.remove('hidden');
         document.getElementById('editBookmarkTitle').focus();
     }
@@ -743,6 +746,9 @@ class BookmarkManager {
         
         document.getElementById('editBookmarkTitle').value = bookmark.title;
         document.getElementById('editBookmarkUrl').value = bookmark.url;
+        
+        // Position the modal near the bookmark being duplicated
+        this.positionEditModal(modal);
         
         modal.classList.remove('hidden');
         document.getElementById('editBookmarkTitle').focus();
@@ -969,6 +975,43 @@ class BookmarkManager {
         if (highlightedElement) {
             highlightedElement.classList.remove('tile-highlighted');
         }
+    }
+
+    // Position edit modal near the bookmark being edited
+    positionEditModal(modal) {
+        if (!this.currentBookmarkId) return;
+        
+        const bookmarkElement = document.querySelector(`[data-bookmark-id="${this.currentBookmarkId}"]`);
+        if (!bookmarkElement) return;
+        
+        const rect = bookmarkElement.getBoundingClientRect();
+        
+        // Position modal to the right of the bookmark, or left if not enough space
+        let left = rect.right + 10;
+        let top = rect.top;
+        
+        // Check if modal would go off screen horizontally (384px is modal width - w-96)
+        if (left + 384 > window.innerWidth) {
+            left = rect.left - 384 - 10;
+        }
+        
+        // Check if modal would go off screen vertically (approximate modal height ~300px)
+        if (top + 300 > window.innerHeight) {
+            top = rect.bottom - 300;
+        }
+        
+        // Ensure modal doesn't go above viewport
+        if (top < 0) {
+            top = 10;
+        }
+        
+        // Ensure modal doesn't go too far left
+        if (left < 10) {
+            left = 10;
+        }
+        
+        modal.style.left = `${left}px`;
+        modal.style.top = `${top}px`;
     }
 
     // Removed unused bookmark card and list rendering methods
