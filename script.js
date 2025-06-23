@@ -6,6 +6,8 @@ class BookmarkManager {
         this.draggedBookmarkId = null;
         this.isDuplicateMode = false;
         this.duplicatedBookmarkId = null;
+        this.selectedFavicon = null;
+        this.faviconDebounceTimer = null;
         this.init();
     }
 
@@ -30,6 +32,11 @@ class BookmarkManager {
         document.getElementById('addBookmarkForm').addEventListener('submit', (e) => {
             e.preventDefault();
             this.addBookmark();
+        });
+
+        // URL input change for favicon loading
+        document.getElementById('bookmarkUrl').addEventListener('input', (e) => {
+            this.handleUrlInputChange(e.target.value);
         });
 
 
@@ -476,6 +483,180 @@ class BookmarkManager {
     hideAddBookmarkModal() {
         document.getElementById('addBookmarkModal').classList.add('hidden');
         document.getElementById('addBookmarkForm').reset();
+        document.getElementById('faviconSelection').classList.add('hidden');
+        this.selectedFavicon = null;
+        if (this.faviconDebounceTimer) {
+            clearTimeout(this.faviconDebounceTimer);
+        }
+    }
+
+    handleUrlInputChange(url) {
+        if (this.faviconDebounceTimer) {
+            clearTimeout(this.faviconDebounceTimer);
+        }
+
+        if (!url || !this.isValidUrl(url)) {
+            document.getElementById('faviconSelection').classList.add('hidden');
+            this.selectedFavicon = null;
+            return;
+        }
+
+        this.faviconDebounceTimer = setTimeout(() => {
+            this.loadFaviconOptions(url);
+        }, 500);
+    }
+
+    async loadFaviconOptions(url) {
+        const faviconSelection = document.getElementById('faviconSelection');
+        const faviconOptions = document.getElementById('faviconOptions');
+        
+        faviconSelection.classList.remove('hidden');
+        faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
+
+        try {
+            const faviconUrls = await this.getAllFaviconUrls(url);
+            this.displayFaviconOptions(faviconUrls);
+        } catch (error) {
+            faviconOptions.innerHTML = '<div class="text-sm text-red-500 col-span-6 text-center">Failed to load favicon options</div>';
+        }
+    }
+
+    async getAllFaviconUrls(url) {
+        const hostname = new URL(url).hostname;
+        const origin = new URL(url).origin;
+        const faviconUrls = [];
+        
+        // Add Google favicon service as first option
+        faviconUrls.push({
+            url: `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`,
+            label: 'Google Favicon Service'
+        });
+
+        try {
+            const response = await fetch(url);
+            if (response.ok) {
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                const faviconSelectors = [
+                    'link[rel*="icon"][sizes*="192"]',
+                    'link[rel*="icon"][sizes*="180"]',
+                    'link[rel*="icon"][sizes*="152"]',
+                    'link[rel*="icon"][sizes*="144"]',
+                    'link[rel*="icon"][sizes*="128"]',
+                    'link[rel*="icon"][sizes*="96"]',
+                    'link[rel="apple-touch-icon"]',
+                    'link[rel="apple-touch-icon-precomposed"]',
+                    'link[rel="icon"]',
+                    'link[rel="shortcut icon"]'
+                ];
+                
+                for (const selector of faviconSelectors) {
+                    const links = doc.querySelectorAll(selector);
+                    for (const link of links) {
+                        if (link.href) {
+                            const faviconUrl = new URL(link.href, url).href;
+                            const sizes = link.getAttribute('sizes') || 'unspecified';
+                            faviconUrls.push({
+                                url: faviconUrl,
+                                label: `${link.rel} (${sizes})`
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.log('Could not parse HTML for favicons');
+        }
+        
+        // Add common favicon paths
+        const commonPaths = [
+            { path: '/apple-touch-icon.png', label: 'Apple Touch Icon' },
+            { path: '/favicon-192x192.png', label: 'Android Chrome 192x192' },
+            { path: '/favicon-96x96.png', label: 'Favicon 96x96' },
+            { path: '/favicon-32x32.png', label: 'Favicon 32x32' },
+            { path: '/favicon.ico', label: 'Classic Favicon' }
+        ];
+
+        for (const {path, label} of commonPaths) {
+            faviconUrls.push({
+                url: `${origin}${path}`,
+                label: label
+            });
+        }
+
+        // Remove duplicates
+        const uniqueUrls = [];
+        const seenUrls = new Set();
+        for (const favicon of faviconUrls) {
+            if (!seenUrls.has(favicon.url)) {
+                seenUrls.add(favicon.url);
+                uniqueUrls.push(favicon);
+            }
+        }
+
+        return uniqueUrls;
+    }
+
+    async displayFaviconOptions(faviconUrls) {
+        const faviconOptions = document.getElementById('faviconOptions');
+        
+        if (faviconUrls.length === 0) {
+            faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">No favicon options found</div>';
+            return;
+        }
+
+        faviconOptions.innerHTML = '';
+        
+        for (let i = 0; i < faviconUrls.length; i++) {
+            const favicon = faviconUrls[i];
+            const faviconElement = document.createElement('div');
+            faviconElement.className = 'favicon-option w-10 h-10 border border-gray-300 rounded cursor-pointer hover:border-blue-500 flex items-center justify-center bg-white transition-colors';
+            faviconElement.title = favicon.label;
+            faviconElement.dataset.faviconUrl = favicon.url;
+            
+            const img = document.createElement('img');
+            img.src = favicon.url;
+            img.className = 'w-8 h-8 rounded';
+            img.style.display = 'block';
+            
+            const fallback = document.createElement('div');
+            fallback.className = 'w-8 h-8 bg-gray-300 rounded flex items-center justify-center text-xs text-gray-600';
+            fallback.textContent = '?';
+            fallback.style.display = 'none';
+            
+            img.onerror = () => {
+                img.style.display = 'none';
+                fallback.style.display = 'flex';
+            };
+            
+            faviconElement.appendChild(img);
+            faviconElement.appendChild(fallback);
+            
+            faviconElement.addEventListener('click', () => {
+                this.selectFavicon(faviconElement, favicon.url);
+            });
+            
+            faviconOptions.appendChild(faviconElement);
+            
+            // Auto-select first option
+            if (i === 0) {
+                this.selectFavicon(faviconElement, favicon.url);
+            }
+        }
+    }
+
+    selectFavicon(element, url) {
+        // Remove previous selection
+        const currentSelected = document.querySelector('.favicon-option.selected');
+        if (currentSelected) {
+            currentSelected.classList.remove('selected', 'border-blue-500', 'bg-blue-50');
+        }
+        
+        // Add selection to new element
+        element.classList.add('selected', 'border-blue-500', 'bg-blue-50');
+        this.selectedFavicon = url;
     }
 
     async addBookmark() {
@@ -488,7 +669,7 @@ class BookmarkManager {
             id: Date.now(),
             title,
             url,
-            favicon: '',
+            favicon: this.selectedFavicon || '',
             dateAdded: new Date().toISOString()
         };
 
@@ -497,7 +678,10 @@ class BookmarkManager {
         this.renderQuickAccess();
         this.hideAddBookmarkModal();
         
-        this.updateFaviconAsync(bookmark.id, url);
+        // Only update favicon async if no favicon was selected
+        if (!this.selectedFavicon) {
+            this.updateFaviconAsync(bookmark.id, url);
+        }
     }
 
 
