@@ -454,12 +454,45 @@ class BookmarkManager {
 
     async loadBookmarks() {
         try {
-            const result = await chrome.storage.local.get(['bookmarks']);
-            this.bookmarks = result.bookmarks || await this.getDefaultBookmarks();
-            } catch (error) {
-            console.log('Using default bookmarks');
-            this.bookmarks = await this.getDefaultBookmarks();
+            let result;
+            let loadedFromSync = false;
+            
+            // Try to load from sync storage first
+            try {
+                result = await chrome.storage.sync.get(['bookmarks']);
+                if (result.bookmarks && result.bookmarks.length > 0) {
+                    console.log('Loaded bookmarks from sync storage');
+                    loadedFromSync = true;
+                } else {
+                    throw new Error('No bookmarks in sync storage');
+                }
+            } catch (syncError) {
+                // Fallback to local storage
+                console.log('Loading from local storage');
+                result = await chrome.storage.local.get(['bookmarks']);
+                
+                // If we have bookmarks in local but not sync, try to migrate them
+                if (result.bookmarks && result.bookmarks.length > 0) {
+                    console.log('Found bookmarks in local storage, attempting to migrate to sync');
+                    const bookmarksData = JSON.stringify(result.bookmarks);
+                    const sizeInBytes = new TextEncoder().encode(bookmarksData).length;
+                    
+                    if (sizeInBytes <= 8000) {
+                        try {
+                            await chrome.storage.sync.set({ bookmarks: result.bookmarks });
+                            console.log('Successfully migrated bookmarks to sync storage');
+                        } catch (migrationError) {
+                            console.log('Migration to sync failed, keeping in local storage');
+                        }
+                    }
+                }
             }
+            
+            this.bookmarks = result.bookmarks || await this.getDefaultBookmarks();
+        } catch (error) {
+            console.log('Error loading bookmarks, using default bookmarks');
+            this.bookmarks = await this.getDefaultBookmarks();
+        }
     }
 
     async getDefaultBookmarks() {
@@ -488,7 +521,24 @@ class BookmarkManager {
 
     async saveBookmarks() {
         try {
-            await chrome.storage.local.set({ bookmarks: this.bookmarks });
+            // Try to save to sync storage first, fallback to local storage
+            try {
+                // Check if bookmarks data is too large for sync storage
+                const bookmarksData = JSON.stringify(this.bookmarks);
+                const sizeInBytes = new TextEncoder().encode(bookmarksData).length;
+                
+                // Chrome sync storage limits: 8KB per item, 100KB total
+                if (sizeInBytes > 8000) { // 8KB limit with some buffer
+                    console.log('Bookmarks data too large for sync storage, using local storage');
+                    await chrome.storage.local.set({ bookmarks: this.bookmarks });
+                } else {
+                    await chrome.storage.sync.set({ bookmarks: this.bookmarks });
+                    console.log('Saved bookmarks to sync storage');
+                }
+            } catch (syncError) {
+                console.log('Sync storage failed, saving to local storage:', syncError.message);
+                await chrome.storage.local.set({ bookmarks: this.bookmarks });
+            }
         } catch (error) {
             console.error('Error saving bookmarks:', error);
         }
