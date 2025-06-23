@@ -33,17 +33,7 @@ class BookmarkManager {
                 this.syncAvailable = true;
                 console.log('✅ Chrome sync storage is available and working');
                 console.log('Extension ID:', chrome.runtime.id);
-                
-                // Check if user is signed in to Chrome
-                if (chrome.identity && chrome.identity.getProfileUserInfo) {
-                    chrome.identity.getProfileUserInfo((userInfo) => {
-                        if (userInfo.email) {
-                            console.log('✅ User is signed into Chrome:', userInfo.email);
-                        } else {
-                            console.log('⚠️ User may not be signed into Chrome or sync may be disabled');
-                        }
-                    });
-                }
+                console.log('💡 For sync to work: ensure you are signed into Chrome on all devices');
             } else {
                 throw new Error('Sync test failed');
             }
