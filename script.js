@@ -711,6 +711,9 @@ class BookmarkManager {
             return;
         }
         
+        // Highlight the bookmark being edited
+        this.highlightBookmarkBeingEdited(this.currentBookmarkId);
+        
         const modal = document.getElementById('editBookmarkModal');
         const modalTitle = modal.querySelector('h3');
         modalTitle.textContent = 'Edit Bookmark';
@@ -731,6 +734,9 @@ class BookmarkManager {
             return;
         }
         
+        // Highlight the bookmark being duplicated
+        this.highlightBookmarkBeingEdited(this.currentBookmarkId);
+        
         const modal = document.getElementById('editBookmarkModal');
         const modalTitle = modal.querySelector('h3');
         modalTitle.textContent = 'Duplicate Bookmark';
@@ -743,6 +749,9 @@ class BookmarkManager {
     }
 
     async hideEditBookmarkModal() {
+        // Remove highlighting
+        this.removeBookmarkHighlight();
+        
         document.getElementById('editBookmarkModal').classList.add('hidden');
         document.getElementById('editBookmarkForm').reset();
         this.currentBookmarkId = null;
@@ -941,6 +950,25 @@ class BookmarkManager {
     async deleteBookmarkById(bookmarkId) {
         this.bookmarks = this.bookmarks.filter(b => b.id !== bookmarkId);
         await this.saveBookmarks();
+    }
+
+    // Bookmark highlighting methods
+    highlightBookmarkBeingEdited(bookmarkId) {
+        // Remove any existing highlights
+        this.removeBookmarkHighlight();
+        
+        // Add highlight to the current bookmark
+        const bookmarkElement = document.querySelector(`[data-bookmark-id="${bookmarkId}"]`);
+        if (bookmarkElement) {
+            bookmarkElement.classList.add('tile-highlighted');
+        }
+    }
+
+    removeBookmarkHighlight() {
+        const highlightedElement = document.querySelector('.tile-highlighted');
+        if (highlightedElement) {
+            highlightedElement.classList.remove('tile-highlighted');
+        }
     }
 
     // Removed unused bookmark card and list rendering methods
