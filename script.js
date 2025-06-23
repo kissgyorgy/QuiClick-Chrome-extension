@@ -686,13 +686,16 @@ class BookmarkManager {
             dateAdded: new Date().toISOString()
         };
 
+        // Check if a favicon was selected before hiding modal (which resets selectedFavicon)
+        const faviconWasSelected = !!this.selectedFavicon;
+        
         this.bookmarks.unshift(bookmark);
         await this.saveBookmarks();
         this.renderQuickAccess();
         this.hideAddBookmarkModal();
         
         // Only update favicon async if no favicon was selected
-        if (!this.selectedFavicon) {
+        if (!faviconWasSelected) {
             this.updateFaviconAsync(bookmark.id, url);
         }
     }
