@@ -892,6 +892,9 @@ class BookmarkManager {
         
         if (!bookmark) return;
         
+        // Highlight the bookmark being deleted
+        this.highlightBookmarkForDeletion(this.currentBookmarkId);
+        
         // Update the confirmation message with the bookmark title
         const messageElement = document.getElementById('deleteConfirmMessage');
         messageElement.innerHTML = `Are you sure you want to delete <strong>${bookmark.title}</strong>?`;
@@ -929,11 +932,16 @@ class BookmarkManager {
     }
     
     hideDeleteConfirmation() {
+        // Remove delete highlighting
+        this.removeDeleteHighlight();
         document.getElementById('deleteConfirmPopup').classList.add('hidden');
     }
     
     async confirmDeleteBookmark() {
         if (!this.currentBookmarkId) return;
+        
+        // Remove highlighting before deleting
+        this.removeDeleteHighlight();
         
         this.bookmarks = this.bookmarks.filter(b => b.id !== this.currentBookmarkId);
         await this.saveBookmarks();
@@ -974,6 +982,26 @@ class BookmarkManager {
         const highlightedElement = document.querySelector('.tile-highlighted');
         if (highlightedElement) {
             highlightedElement.classList.remove('tile-highlighted');
+        }
+    }
+
+    // Delete highlighting methods
+    highlightBookmarkForDeletion(bookmarkId) {
+        // Remove any existing highlights
+        this.removeBookmarkHighlight();
+        this.removeDeleteHighlight();
+        
+        // Add delete highlight to the current bookmark
+        const bookmarkElement = document.querySelector(`[data-bookmark-id="${bookmarkId}"]`);
+        if (bookmarkElement) {
+            bookmarkElement.classList.add('tile-delete-highlighted');
+        }
+    }
+
+    removeDeleteHighlight() {
+        const deleteHighlightedElement = document.querySelector('.tile-delete-highlighted');
+        if (deleteHighlightedElement) {
+            deleteHighlightedElement.classList.remove('tile-delete-highlighted');
         }
     }
 

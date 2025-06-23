@@ -726,6 +726,17 @@
   background: rgba(59, 130, 246, 0.15) !important;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3) !important;
 }
+.tile-delete-highlighted {
+  background: rgba(239, 68, 68, 0.1) !important;
+  border: 2px solid #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
+  transform: scale(1.02);
+  transition: all 0.2s ease-out;
+}
+.tile-delete-highlighted:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3) !important;
+}
 @property --tw-space-x-reverse {
   syntax: "*";
   inherits: false;
