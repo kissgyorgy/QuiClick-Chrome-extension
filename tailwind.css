@@ -671,6 +671,13 @@
 .modal-backdrop.closing {
   animation: modalFadeOut 0.2s ease-out;
 }
+.modal-no-backdrop {
+  background: transparent;
+  pointer-events: none;
+}
+.modal-no-backdrop > * {
+  pointer-events: auto;
+}
 .modal-content {
   background: white;
   border: 1px solid #e2e8f0;

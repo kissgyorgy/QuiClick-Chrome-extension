@@ -66,6 +66,16 @@
   animation: modalFadeOut 0.2s ease-out;
 }
 
+/* Modal without backdrop */
+.modal-no-backdrop {
+  background: transparent;
+  pointer-events: none;
+}
+
+.modal-no-backdrop > * {
+  pointer-events: auto;
+}
+
 /* Modal Content Styling */
 .modal-content {
   background: white;
@@ -89,6 +99,7 @@
               0 10px 10px -5px rgba(0, 0, 0, 0.04);
   animation: modalSlideIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   transform-origin: top left;
+  /* No backdrop - appears at cursor position */
 }
 
 .context-menu.closing {
