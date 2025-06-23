@@ -67,12 +67,12 @@ class BookmarkManager {
         
         if (this.syncAvailable) {
             syncStatus.classList.remove('hidden');
-            syncIcon.className = 'w-4 h-4 text-green-600';
+            syncIcon.setAttribute('class', 'w-4 h-4 text-green-600');
             syncStatusText.textContent = 'Sync enabled';
             syncStatusText.className = 'text-green-600';
         } else {
             syncStatus.classList.remove('hidden');
-            syncIcon.className = 'w-4 h-4 text-orange-600';
+            syncIcon.setAttribute('class', 'w-4 h-4 text-orange-600');
             syncStatusText.textContent = 'Local only';
             syncStatusText.className = 'text-orange-600';
         }
