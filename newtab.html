@@ -20,6 +20,12 @@
                 <h1 class="text-2xl font-bold text-custom-text">QuiClick</h1>
             </div>
             <div class="flex items-center space-x-4">
+                <div id="syncStatus" class="hidden flex items-center space-x-1 text-sm text-gray-600">
+                    <svg id="syncIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    <span id="syncStatusText">Sync enabled</span>
+                </div>
                 <button id="addBookmarkBtn" class="bg-custom-accent text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2 cursor-pointer font-bold text-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
