@@ -119,3 +119,17 @@
 .delete-popup.closing {
   animation: modalSlideOut 0.15s ease-out;
 }
+
+/* Bookmark Tile Highlighting */
+.tile-highlighted {
+  background: rgba(59, 130, 246, 0.1) !important;
+  border: 2px solid #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
+  transform: scale(1.02);
+  transition: all 0.2s ease-out;
+}
+
+.tile-highlighted:hover {
+  background: rgba(59, 130, 246, 0.15) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3) !important;
+}
