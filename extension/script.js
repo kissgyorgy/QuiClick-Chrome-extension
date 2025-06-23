@@ -103,12 +103,22 @@ class BookmarkManager {
 
         // Hide context menu when clicking elsewhere
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('#contextMenu') && !e.target.closest('#editBookmarkModal') && !e.target.closest('#deleteConfirmPopup')) {
+            const isClickInsideModal = e.target.closest('#contextMenu') || 
+                                      e.target.closest('#editBookmarkModal') || 
+                                      e.target.closest('#deleteConfirmPopup') ||
+                                      e.target.closest('#addBookmarkModal');
+            
+            if (!isClickInsideModal) {
                 this.hideContextMenu();
                 this.hideDeleteConfirmation();
-                // Clear currentBookmarkId when context menu is dismissed by clicking elsewhere
-                console.log('Clearing currentBookmarkId due to click outside');
-                this.currentBookmarkId = null;
+                // Only clear currentBookmarkId if no modals are open
+                const editModalOpen = !document.getElementById('editBookmarkModal').classList.contains('hidden');
+                const addModalOpen = !document.getElementById('addBookmarkModal').classList.contains('hidden');
+                
+                if (!editModalOpen && !addModalOpen) {
+                    console.log('Clearing currentBookmarkId due to click outside');
+                    this.currentBookmarkId = null;
+                }
             }
         });
 
