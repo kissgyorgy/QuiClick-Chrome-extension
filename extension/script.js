@@ -168,6 +168,10 @@ class BookmarkManager {
             this.showAddBookmarkModal();
             document.getElementById('bookmarkUrl').value = url;
             document.getElementById('bookmarkTitle').value = title;
+            
+            // Trigger favicon loading for the pasted URL
+            this.handleUrlInputChange(url);
+            
             document.getElementById('bookmarkTitle').focus();
             document.getElementById('bookmarkTitle').select();
         } else {
@@ -180,6 +184,10 @@ class BookmarkManager {
                 this.showAddBookmarkModal();
                 document.getElementById('bookmarkUrl').value = url;
                 document.getElementById('bookmarkTitle').value = title;
+                
+                // Trigger favicon loading for the extracted URL
+                this.handleUrlInputChange(url);
+                
                 document.getElementById('bookmarkTitle').focus();
                 document.getElementById('bookmarkTitle').select();
             }
@@ -418,19 +426,20 @@ class BookmarkManager {
             }
         }
 
-        const bookmark = {
-            id: Date.now(),
-            title: bookmarkTitle,
-            url: url,
-            favicon: '',
-            dateAdded: new Date().toISOString()
-        };
-
-        this.bookmarks.unshift(bookmark);
-        await this.saveBookmarks();
-        this.renderQuickAccess();
+        // Show the add bookmark modal with pre-filled data
+        this.showAddBookmarkModal();
+        document.getElementById('bookmarkTitle').value = bookmarkTitle;
+        document.getElementById('bookmarkUrl').value = url;
         
-        this.updateFaviconAsync(bookmark.id, url);
+        // Trigger favicon loading for the dropped URL
+        this.handleUrlInputChange(url);
+        
+        // Focus the title field and select the text for easy editing
+        setTimeout(() => {
+            const titleInput = document.getElementById('bookmarkTitle');
+            titleInput.focus();
+            titleInput.select();
+        }, 100);
     }
 
     async loadBookmarks() {
