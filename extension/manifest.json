@@ -10,7 +10,8 @@
     "storage",
     "bookmarks",
     "activeTab",
-    "tabs"
+    "tabs",
+    "identity"
   ],
   "host_permissions": [
     "http://*/*",

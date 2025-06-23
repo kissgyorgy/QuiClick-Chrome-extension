@@ -8,13 +8,74 @@ class BookmarkManager {
         this.duplicatedBookmarkId = null;
         this.selectedFavicon = null;
         this.faviconDebounceTimer = null;
+        this.syncAvailable = false;
         this.init();
     }
 
     async init() {
+        await this.checkSyncAvailability();
         await this.loadBookmarks();
         this.setupEventListeners();
         this.renderQuickAccess();
+    }
+
+    async checkSyncAvailability() {
+        try {
+            // Test if sync storage is available and working
+            const testKey = 'syncTest_' + Date.now();
+            const testValue = 'test';
+            
+            await chrome.storage.sync.set({ [testKey]: testValue });
+            const result = await chrome.storage.sync.get([testKey]);
+            await chrome.storage.sync.remove([testKey]);
+            
+            if (result[testKey] === testValue) {
+                this.syncAvailable = true;
+                console.log('✅ Chrome sync storage is available and working');
+                console.log('Extension ID:', chrome.runtime.id);
+                
+                // Check if user is signed in to Chrome
+                if (chrome.identity && chrome.identity.getProfileUserInfo) {
+                    chrome.identity.getProfileUserInfo((userInfo) => {
+                        if (userInfo.email) {
+                            console.log('✅ User is signed into Chrome:', userInfo.email);
+                        } else {
+                            console.log('⚠️ User may not be signed into Chrome or sync may be disabled');
+                        }
+                    });
+                }
+            } else {
+                throw new Error('Sync test failed');
+            }
+        } catch (error) {
+            this.syncAvailable = false;
+            console.log('❌ Chrome sync storage not available:', error.message);
+            console.log('📝 Sync troubleshooting:');
+            console.log('   1. Make sure you are signed into Chrome');
+            console.log('   2. Check Chrome sync settings (chrome://settings/syncSetup)');
+            console.log('   3. Ensure Extensions sync is enabled');
+            console.log('   4. For unpacked extensions, sync may not work across different computers');
+        }
+        
+        this.updateSyncStatusUI();
+    }
+
+    updateSyncStatusUI() {
+        const syncStatus = document.getElementById('syncStatus');
+        const syncIcon = document.getElementById('syncIcon');
+        const syncStatusText = document.getElementById('syncStatusText');
+        
+        if (this.syncAvailable) {
+            syncStatus.classList.remove('hidden');
+            syncIcon.className = 'w-4 h-4 text-green-600';
+            syncStatusText.textContent = 'Sync enabled';
+            syncStatusText.className = 'text-green-600';
+        } else {
+            syncStatus.classList.remove('hidden');
+            syncIcon.className = 'w-4 h-4 text-orange-600';
+            syncStatusText.textContent = 'Local only';
+            syncStatusText.className = 'text-orange-600';
+        }
     }
 
     setupEventListeners() {
@@ -457,22 +518,28 @@ class BookmarkManager {
             let result;
             let loadedFromSync = false;
             
-            // Try to load from sync storage first
-            try {
-                result = await chrome.storage.sync.get(['bookmarks']);
-                if (result.bookmarks && result.bookmarks.length > 0) {
-                    console.log('Loaded bookmarks from sync storage');
-                    loadedFromSync = true;
-                } else {
-                    throw new Error('No bookmarks in sync storage');
+            // Try to load from sync storage first (only if sync is available)
+            if (this.syncAvailable) {
+                try {
+                    result = await chrome.storage.sync.get(['bookmarks']);
+                    if (result.bookmarks && result.bookmarks.length > 0) {
+                        console.log('Loaded bookmarks from sync storage');
+                        loadedFromSync = true;
+                    } else {
+                        throw new Error('No bookmarks in sync storage');
+                    }
+                } catch (syncError) {
+                    console.log('Sync storage error, falling back to local:', syncError.message);
                 }
-            } catch (syncError) {
+            }
+            
+            if (!loadedFromSync) {
                 // Fallback to local storage
                 console.log('Loading from local storage');
                 result = await chrome.storage.local.get(['bookmarks']);
                 
-                // If we have bookmarks in local but not sync, try to migrate them
-                if (result.bookmarks && result.bookmarks.length > 0) {
+                // If we have bookmarks in local but not sync, try to migrate them (only if sync is available)
+                if (this.syncAvailable && result.bookmarks && result.bookmarks.length > 0) {
                     console.log('Found bookmarks in local storage, attempting to migrate to sync');
                     const bookmarksData = JSON.stringify(result.bookmarks);
                     const sizeInBytes = new TextEncoder().encode(bookmarksData).length;
@@ -484,6 +551,8 @@ class BookmarkManager {
                         } catch (migrationError) {
                             console.log('Migration to sync failed, keeping in local storage');
                         }
+                    } else {
+                        console.log('Bookmarks too large for sync storage, keeping in local storage');
                     }
                 }
             }
@@ -521,22 +590,27 @@ class BookmarkManager {
 
     async saveBookmarks() {
         try {
-            // Try to save to sync storage first, fallback to local storage
-            try {
-                // Check if bookmarks data is too large for sync storage
-                const bookmarksData = JSON.stringify(this.bookmarks);
-                const sizeInBytes = new TextEncoder().encode(bookmarksData).length;
-                
-                // Chrome sync storage limits: 8KB per item, 100KB total
-                if (sizeInBytes > 8000) { // 8KB limit with some buffer
-                    console.log('Bookmarks data too large for sync storage, using local storage');
+            // Try to save to sync storage first (only if available), fallback to local storage
+            if (this.syncAvailable) {
+                try {
+                    // Check if bookmarks data is too large for sync storage
+                    const bookmarksData = JSON.stringify(this.bookmarks);
+                    const sizeInBytes = new TextEncoder().encode(bookmarksData).length;
+                    
+                    // Chrome sync storage limits: 8KB per item, 100KB total
+                    if (sizeInBytes > 8000) { // 8KB limit with some buffer
+                        console.log('Bookmarks data too large for sync storage, using local storage');
+                        await chrome.storage.local.set({ bookmarks: this.bookmarks });
+                    } else {
+                        await chrome.storage.sync.set({ bookmarks: this.bookmarks });
+                        console.log('Saved bookmarks to sync storage');
+                    }
+                } catch (syncError) {
+                    console.log('Sync storage failed, saving to local storage:', syncError.message);
                     await chrome.storage.local.set({ bookmarks: this.bookmarks });
-                } else {
-                    await chrome.storage.sync.set({ bookmarks: this.bookmarks });
-                    console.log('Saved bookmarks to sync storage');
                 }
-            } catch (syncError) {
-                console.log('Sync storage failed, saving to local storage:', syncError.message);
+            } else {
+                console.log('Sync not available, saving to local storage');
                 await chrome.storage.local.set({ bookmarks: this.bookmarks });
             }
         } catch (error) {
