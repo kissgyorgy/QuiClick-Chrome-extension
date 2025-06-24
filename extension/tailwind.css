@@ -347,17 +347,14 @@
   .h-24 {
     height: calc(var(--spacing) * 24);
   }
+  .h-\[95vh\] {
+    height: 95vh;
+  }
   .h-full {
     height: 100%;
   }
   .max-h-\[80vh\] {
     max-height: 80vh;
-  }
-  .max-h-\[95vh\] {
-    max-height: 95vh;
-  }
-  .max-h-\[calc\(95vh-120px\)\] {
-    max-height: calc(95vh - 120px);
   }
   .min-h-screen {
     min-height: 100vh;
@@ -424,6 +421,9 @@
   }
   .grid-cols-6 {
     grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .flex-col {
+    flex-direction: column;
   }
   .flex-wrap {
     flex-wrap: wrap;
