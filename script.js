@@ -256,8 +256,9 @@ class BookmarkManager {
                 const renameFolderModalOpen = !document.getElementById('renameFolderModal').classList.contains('hidden');
                 
                 if (!editModalOpen && !addModalOpen && !settingsModalOpen && !folderModalOpen && !createFolderModalOpen && !renameFolderModalOpen) {
-                    console.log('Clearing currentBookmarkId due to click outside');
+                    console.log('Clearing currentBookmarkId and currentFolderId due to click outside');
                     this.currentBookmarkId = null;
+                    this.currentFolderId = null;
                 }
             }
         });
@@ -1252,9 +1253,7 @@ class BookmarkManager {
         contextMenu.classList.add('hidden');
         // Reset z-index to default
         contextMenu.style.zIndex = '50';
-        // Don't clear currentBookmarkId here as it's needed for edit/delete operations
-        // But clear currentFolderId when hiding context menu
-        this.currentFolderId = null;
+        // Don't clear currentBookmarkId or currentFolderId here as they're needed for edit/delete operations
     }
 
     showEditBookmarkModal() {
