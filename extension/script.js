@@ -1001,8 +1001,9 @@ class BookmarkManager {
         quickAccessContainer.innerHTML = folderTiles + bookmarkTiles + addButtonTile;
         
         // Add event listeners for bookmark clicks and right-clicks
-        this.bookmarks.forEach(bookmark => {
+        visibleBookmarks.forEach(bookmark => {
             const bookmarkElement = quickAccessContainer.querySelector(`[data-bookmark-id="${bookmark.id}"]`);
+            if (!bookmarkElement) return; // Skip if element not found
             
             // Left click - navigate to URL (only if not dragging)
             bookmarkElement.addEventListener('click', (e) => {
