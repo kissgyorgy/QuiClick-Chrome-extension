@@ -158,14 +158,7 @@ class BookmarkManager {
             this.showSettingsModal();
         });
 
-        // Settings modal events
-        document.getElementById('cancelSettingsBtn').addEventListener('click', () => {
-            this.hideSettingsModal();
-        });
-
-        document.getElementById('saveSettingsBtn').addEventListener('click', () => {
-            this.saveSettings();
-        });
+        // Settings modal events - removed Save/Cancel buttons, settings apply immediately
 
         // Settings backdrop click
         document.getElementById('settingsModal').addEventListener('click', (e) => {
@@ -229,9 +222,12 @@ class BookmarkManager {
         });
 
 
-        // Toggle switch styling
+        // Toggle switch styling and immediate settings save
         document.getElementById('showTitles').addEventListener('change', (e) => {
             this.updateToggleVisual(e.target);
+            this.settings.showTitles = e.target.checked;
+            this.saveSettings();
+            this.renderQuickAccess(); // Re-render to show/hide titles immediately
         });
 
         // Hide context menu when clicking elsewhere
@@ -1671,19 +1667,8 @@ class BookmarkManager {
     }
 
     async saveSettings() {
-        const showTitlesToggle = document.getElementById('showTitles');
-        
-        // Update settings object
-        this.settings.showTitles = showTitlesToggle.checked;
-        
-        // Save to storage
+        // Save current settings to storage
         await this.saveSettingsToStorage();
-        
-        // Re-render bookmarks to apply title visibility changes
-        this.renderQuickAccess();
-        
-        // Hide modal
-        this.hideSettingsModal();
     }
 
     updateToggleVisual(toggle) {
