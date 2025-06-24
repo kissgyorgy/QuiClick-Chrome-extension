@@ -16,7 +16,7 @@ class BookmarkManager {
         this.settings = {
             showTitles: true,
             tilesPerRow: 8,
-            tileGap: 2,
+            tileGap: 4,
             showAddButton: true
         };
         this.init();
@@ -1760,28 +1760,18 @@ class BookmarkManager {
         // Get gap class based on setting - explicit mapping for Tailwind compilation
         const gapClasses = {
             0: 'gap-0',
-            2: 'gap-2',
             4: 'gap-4',
-            6: 'gap-6',
             8: 'gap-8',
-            10: 'gap-10',
             12: 'gap-12',
-            14: 'gap-14',
             16: 'gap-16',
-            18: 'gap-18',
             20: 'gap-20',
-            22: 'gap-22',
             24: 'gap-24',
-            26: 'gap-26',
             28: 'gap-28',
-            30: 'gap-30',
             32: 'gap-32',
-            34: 'gap-34',
             36: 'gap-36',
-            38: 'gap-38',
             40: 'gap-40'
         };
-        const gapClass = gapClasses[this.settings.tileGap] || 'gap-2';
+        const gapClass = gapClasses[this.settings.tileGap] || 'gap-4';
         
         // Update quickAccess layout - clean slate with only necessary classes
         quickAccess.classList.add('grid', gridClass, gapClass, maxWidthClass, 'mx-auto', 'place-items-center');
