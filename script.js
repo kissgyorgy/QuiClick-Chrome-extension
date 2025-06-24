@@ -1459,7 +1459,7 @@ class BookmarkManager {
         if (toggle.checked) {
             toggleBg.classList.remove('bg-gray-200');
             toggleBg.classList.add('bg-blue-500');
-            toggleDot.style.transform = 'translateX(22px)';
+            toggleDot.style.transform = 'translateX(16px)';
         } else {
             toggleBg.classList.remove('bg-blue-500');
             toggleBg.classList.add('bg-gray-200');
