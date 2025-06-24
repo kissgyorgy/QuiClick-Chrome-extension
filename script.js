@@ -1691,23 +1691,19 @@ class BookmarkManager {
         const quickAccess = document.getElementById('quickAccess');
         const folderBookmarks = document.getElementById('folderBookmarks');
         
-        // Remove all existing grid classes
-        quickAccess.className = quickAccess.className.replace(/grid-cols-\d+/g, '');
-        if (folderBookmarks) {
-            folderBookmarks.className = folderBookmarks.className.replace(/grid-cols-\d+/g, '');
-        }
+        // Clear all classes and rebuild with only what we need
+        quickAccess.className = '';
         
         // Add new grid class based on tilesPerRow value
         const gridClass = `grid-cols-${tilesPerRow}`;
         
-        // Update quickAccess layout
-        quickAccess.classList.remove('flex', 'flex-wrap', 'justify-center');
-        quickAccess.classList.add('grid', gridClass, 'justify-items-center', 'mx-auto', 'gap-1', 'w-fit');
+        // Update quickAccess layout - clean slate with only necessary classes
+        quickAccess.classList.add('grid', gridClass, 'gap-2', 'w-fit', 'mx-auto');
         
         // Update folderBookmarks layout if it exists
         if (folderBookmarks) {
-            folderBookmarks.classList.remove('flex', 'flex-wrap', 'justify-center');
-            folderBookmarks.classList.add('grid', gridClass, 'justify-items-center', 'mx-auto', 'gap-1', 'w-fit');
+            folderBookmarks.className = '';
+            folderBookmarks.classList.add('grid', gridClass, 'gap-2', 'w-fit', 'mx-auto');
         }
     }
 
