@@ -1007,7 +1007,7 @@ class BookmarkManager {
             const paddingClass = this.settings.showTitles ? 'pt-2 px-4 pb-6' : 'p-4';
             
             return `
-            <div class="tile w-24 h-24 relative bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 hover:shadow-md transition-all duration-200 cursor-pointer" 
+            <div class="tile w-24 h-24 relative bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-200 hover:shadow-md transition-all duration-200 cursor-pointer" 
                  data-folder-id="${folder.id}" 
                  draggable="false"
                  title="${folder.name}">
@@ -1030,7 +1030,7 @@ class BookmarkManager {
             const paddingClass = this.settings.showTitles ? 'pt-2 px-4 pb-6' : 'p-4';
             
             return `
-            <div class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer" 
+            <div class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer" 
                  data-bookmark-id="${bookmark.id}" 
                  draggable="true"
                  title="${bookmark.title}">
@@ -1050,7 +1050,7 @@ class BookmarkManager {
         }).join('');
 
         const addButtonTile = `
-            <div id="addBookmarkTile" class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 border-dashed rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer" 
+            <div id="addBookmarkTile" class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 border-dashed rounded-lg hover:bg-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer" 
                  title="Add New Bookmark">
                 <div class="absolute inset-0 flex items-center justify-center">
                     <span class="text-custom-accent leading-none plus-icon">+</span>
@@ -1863,7 +1863,7 @@ class BookmarkManager {
             const paddingClass = this.settings.showTitles ? 'pt-2 px-4 pb-6' : 'p-4';
             
             return `
-            <div class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer" 
+            <div class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 hover:shadow-md transition-all duration-200 cursor-pointer" 
                  data-bookmark-id="${bookmark.id}" 
                  draggable="true"
                  title="${bookmark.title}">
