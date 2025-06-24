@@ -39,7 +39,6 @@
     --color-gray-600: oklch(0.446 0.03 256.802);
     --color-gray-700: oklch(0.373 0.034 259.733);
     --color-gray-800: oklch(0.278 0.033 256.848);
-    --color-black: #000;
     --color-white: #fff;
     --spacing: 0.25rem;
     --container-4xl: 56rem;
@@ -228,6 +227,9 @@
   }
 }
 @layer utilities {
+  .pointer-events-none {
+    pointer-events: none;
+  }
   .sr-only {
     position: absolute;
     width: 1px;
@@ -307,6 +309,9 @@
   }
   .block {
     display: block;
+  }
+  .contents {
+    display: contents;
   }
   .flex {
     display: flex;
@@ -534,8 +539,17 @@
       background-color: color-mix(in oklab, var(--color-blue-100) 10%, transparent);
     }
   }
+  .bg-blue-100\/20 {
+    background-color: color-mix(in srgb, oklch(0.932 0.032 255.585) 20%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-blue-100) 20%, transparent);
+    }
+  }
   .bg-blue-500 {
     background-color: var(--color-blue-500);
+  }
+  .bg-blue-600 {
+    background-color: var(--color-blue-600);
   }
   .bg-custom-accent {
     background-color: var(--color-custom-accent);
@@ -596,6 +610,9 @@
   }
   .py-2 {
     padding-block: calc(var(--spacing) * 2);
+  }
+  .py-3 {
+    padding-block: calc(var(--spacing) * 3);
   }
   .py-4 {
     padding-block: calc(var(--spacing) * 4);
