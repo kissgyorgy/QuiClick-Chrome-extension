@@ -110,6 +110,7 @@ class BookmarkManager {
                 this.closeFolderModal();
                 this.hideCreateFolderModal();
                 this.hideRenameFolderModal();
+                this.hideContextMenu();
             }
         });
 
