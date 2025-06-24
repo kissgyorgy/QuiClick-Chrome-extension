@@ -16,7 +16,8 @@ class BookmarkManager {
         this.settings = {
             showTitles: true,
             tilesPerRow: 8,
-            tileGap: 2
+            tileGap: 2,
+            showAddButton: true
         };
         this.init();
     }
@@ -226,6 +227,14 @@ class BookmarkManager {
             this.settings.showTitles = e.target.checked;
             this.saveSettings();
             this.renderQuickAccess(); // Re-render to show/hide titles immediately
+        });
+
+        // Show/Hide Add Button toggle
+        document.getElementById('showAddButton').addEventListener('change', (e) => {
+            this.updateToggleVisual(e.target);
+            this.settings.showAddButton = e.target.checked;
+            this.saveSettings();
+            this.renderQuickAccess(); // Re-render to show/hide add button immediately
         });
 
         // Tiles per row slider
@@ -1049,7 +1058,7 @@ class BookmarkManager {
             </div>
         `;
 
-        quickAccessContainer.innerHTML = folderTiles + bookmarkTiles + addButtonTile;
+        quickAccessContainer.innerHTML = folderTiles + bookmarkTiles + (this.settings.showAddButton ? addButtonTile : '');
         
         // Add event listeners for bookmark clicks and right-clicks
         visibleBookmarks.forEach(bookmark => {
@@ -1687,6 +1696,7 @@ class BookmarkManager {
 
     loadCurrentSettingsIntoForm() {
         const showTitlesToggle = document.getElementById('showTitles');
+        const showAddButtonToggle = document.getElementById('showAddButton');
         const tilesPerRowSlider = document.getElementById('tilesPerRow');
         const tilesPerRowValue = document.getElementById('tilesPerRowValue');
         const tileGapSlider = document.getElementById('tileGap');
@@ -1694,6 +1704,9 @@ class BookmarkManager {
         
         showTitlesToggle.checked = this.settings.showTitles;
         this.updateToggleVisual(showTitlesToggle);
+        
+        showAddButtonToggle.checked = this.settings.showAddButton;
+        this.updateToggleVisual(showAddButtonToggle);
         
         tilesPerRowSlider.value = this.settings.tilesPerRow;
         tilesPerRowValue.textContent = this.settings.tilesPerRow;
