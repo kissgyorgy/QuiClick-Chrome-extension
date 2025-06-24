@@ -1656,15 +1656,15 @@ class BookmarkManager {
         // Update sync status in settings modal
         this.updateSettingsSyncStatus();
         
-        // Position modal at bottom right
+        // Position modal at bottom right with specific margins
         modal.classList.remove('hidden');
-        modal.classList.add('right-6', 'bottom-20');
+        modal.classList.add('right-6', 'bottom-20', 'mr-8', '-mb-4');
     }
 
     hideSettingsModal() {
         const modal = document.getElementById('settingsModal');
         modal.classList.add('hidden');
-        modal.classList.remove('right-6', 'bottom-20');
+        modal.classList.remove('right-6', 'bottom-20', 'mr-8', '-mb-4');
         // Reset form to current settings
         this.loadCurrentSettingsIntoForm();
     }
