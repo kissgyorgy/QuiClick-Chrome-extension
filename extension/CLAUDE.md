@@ -111,3 +111,7 @@ Uses Google's favicon service with fallback to letter-based avatars when images 
 ## UI/UX Guidelines
 
 - Always set cursor pointer on every button
+
+## Development Best Practices
+
+- Always use TailwindCSS, don't use custom styles or the style property
