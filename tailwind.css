@@ -347,8 +347,8 @@
   .h-24 {
     height: calc(var(--spacing) * 24);
   }
-  .h-\[95vh\] {
-    height: 95vh;
+  .h-\[50vh\] {
+    height: 50vh;
   }
   .h-full {
     height: 100%;
@@ -430,6 +430,9 @@
   }
   .items-center {
     align-items: center;
+  }
+  .items-start {
+    align-items: flex-start;
   }
   .justify-between {
     justify-content: space-between;
@@ -666,8 +669,14 @@
   .pt-2 {
     padding-top: calc(var(--spacing) * 2);
   }
+  .pt-16 {
+    padding-top: calc(var(--spacing) * 16);
+  }
   .pb-6 {
     padding-bottom: calc(var(--spacing) * 6);
+  }
+  .pb-32 {
+    padding-bottom: calc(var(--spacing) * 32);
   }
   .text-center {
     text-align: center;
