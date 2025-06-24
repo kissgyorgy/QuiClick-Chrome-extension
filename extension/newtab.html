@@ -94,6 +94,20 @@
             </svg>
             <span>Delete</span>
         </button>
+        
+        <!-- Folder-specific menu items -->
+        <button id="renameFolder" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 cursor-pointer font-bold hidden">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            <span>Rename</span>
+        </button>
+        <button id="deleteFolder" class="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 cursor-pointer font-bold hidden">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+            <span>Delete Folder</span>
+        </button>
     </div>
 
     <!-- Edit Bookmark Modal -->
@@ -148,6 +162,23 @@
                 <div class="flex space-x-3">
                     <button type="button" id="cancelCreateFolderBtn" class="flex-1 px-3 py-2 border border-custom-border rounded-lg text-custom-text hover:bg-gray-50 transition-colors cursor-pointer font-bold text-sm">Cancel</button>
                     <button type="submit" class="flex-1 px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors cursor-pointer font-bold text-sm">Create Folder</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Rename Folder Modal -->
+    <div id="renameFolderModal" class="modal-backdrop fixed inset-0 hidden flex items-center justify-center z-50">
+        <div class="modal-content rounded-xl p-6 w-96 mx-4">
+            <h3 class="text-lg font-semibold text-custom-text mb-4">Rename Folder</h3>
+            <form id="renameFolderForm">
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-custom-text mb-2">Folder Name</label>
+                    <input type="text" id="renameFolderName" class="w-full px-3 py-2 border border-custom-border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent" autocomplete="off" required placeholder="Enter new folder name">
+                </div>
+                <div class="flex space-x-3">
+                    <button type="button" id="cancelRenameFolderBtn" class="flex-1 px-3 py-2 border border-custom-border rounded-lg text-custom-text hover:bg-gray-50 transition-colors cursor-pointer font-bold text-sm">Cancel</button>
+                    <button type="submit" class="flex-1 px-3 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors cursor-pointer font-bold text-sm">Rename</button>
                 </div>
             </form>
         </div>
