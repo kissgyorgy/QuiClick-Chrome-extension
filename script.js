@@ -937,13 +937,12 @@ class BookmarkManager {
     renderQuickAccess() {
         const quickAccessContainer = document.getElementById('quickAccess');
         
-        // Filter bookmarks that are not in folders (or are in the current open folder)
-        const visibleBookmarks = this.openFolderId 
-            ? this.bookmarks.filter(b => b.folderId === this.openFolderId)
-            : this.bookmarks.filter(b => !b.folderId);
+        // Always show main view bookmarks (those not in folders) in the main area
+        // The openFolderId is only used for the folder modal, not the main view
+        const visibleBookmarks = this.bookmarks.filter(b => !b.folderId);
         
-        // Render folder tiles (only if not inside a folder)
-        const folderTiles = this.openFolderId ? '' : this.folders.map(folder => {
+        // Render folder tiles (always show in main view)
+        const folderTiles = this.folders.map(folder => {
             const paddingClass = this.settings.showTitles ? 'pt-2 px-4 pb-6' : 'p-4';
             
             return `
