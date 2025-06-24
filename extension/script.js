@@ -1256,9 +1256,9 @@ class BookmarkManager {
         // Set higher z-index if folder modal is open
         const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
         if (folderModalOpen) {
-            contextMenu.style.zIndex = '60'; // Higher than folder modal's z-50
+            contextMenu.style.zIndex = '70'; // Higher than folder modal's z-50
         } else {
-            contextMenu.style.zIndex = '50'; // Default z-index
+            contextMenu.style.zIndex = '60'; // Default z-index
         }
         
         contextMenu.style.left = `${event.pageX}px`;
@@ -1282,7 +1282,7 @@ class BookmarkManager {
         const contextMenu = document.getElementById('contextMenu');
         contextMenu.classList.add('hidden');
         // Reset z-index to default
-        contextMenu.style.zIndex = '50';
+        contextMenu.style.zIndex = '60';
         // Don't clear currentBookmarkId or currentFolderId here as they're needed for edit/delete operations
     }
 
@@ -1994,9 +1994,9 @@ class BookmarkManager {
         // Set higher z-index if folder modal is open
         const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
         if (folderModalOpen) {
-            contextMenu.style.zIndex = '60'; // Higher than folder modal's z-50
+            contextMenu.style.zIndex = '70'; // Higher than folder modal's z-50
         } else {
-            contextMenu.style.zIndex = '50'; // Default z-index
+            contextMenu.style.zIndex = '60'; // Default z-index
         }
         
         contextMenu.style.left = `${event.pageX}px`;

@@ -301,6 +301,9 @@
   .z-50 {
     z-index: 50;
   }
+  .z-60 {
+    z-index: 60;
+  }
   .col-span-6 {
     grid-column: span 6 / span 6;
   }
