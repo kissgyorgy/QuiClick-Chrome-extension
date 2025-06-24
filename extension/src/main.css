@@ -162,3 +162,14 @@
   background: rgba(239, 68, 68, 0.15) !important;
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3) !important;
 }
+
+/* Toggle Switch Styles */
+.toggle-bg {
+  transition: background-color 0.2s ease;
+}
+
+.toggle-dot {
+  background: white;
+  border: 1px solid #d1d5db;
+  transition: transform 0.2s ease;
+}
