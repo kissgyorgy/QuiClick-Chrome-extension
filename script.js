@@ -1241,6 +1241,32 @@ class BookmarkManager {
         this.renderQuickAccess();
     }
 
+    // Helper function to get the appropriate z-index for context menu based on open modals
+    getContextMenuZIndex() {
+        // Check all possible modals and return appropriate z-index
+        const modals = [
+            { id: 'addBookmarkModal', zIndex: 50 },
+            { id: 'editBookmarkModal', zIndex: 60 },
+            { id: 'deleteConfirmPopup', zIndex: 50 },
+            { id: 'createFolderModal', zIndex: 50 },
+            { id: 'renameFolderModal', zIndex: 50 },
+            { id: 'folderModal', zIndex: 50 },
+            { id: 'settingsModal', zIndex: 50 }
+        ];
+        
+        let highestModalZIndex = 0;
+        
+        for (const modal of modals) {
+            const element = document.getElementById(modal.id);
+            if (element && !element.classList.contains('hidden')) {
+                highestModalZIndex = Math.max(highestModalZIndex, modal.zIndex);
+            }
+        }
+        
+        // Return z-index that's 10 higher than the highest open modal, minimum 60
+        return Math.max(60, highestModalZIndex + 10);
+    }
+
     showContextMenu(event, bookmarkId) {
         console.log('showContextMenu called with bookmarkId:', bookmarkId);
         this.currentBookmarkId = bookmarkId;
@@ -1253,13 +1279,8 @@ class BookmarkManager {
         document.getElementById('renameFolder').classList.add('hidden');
         document.getElementById('deleteFolder').classList.add('hidden');
         
-        // Set higher z-index if folder modal is open
-        const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
-        if (folderModalOpen) {
-            contextMenu.style.zIndex = '70'; // Higher than folder modal's z-50
-        } else {
-            contextMenu.style.zIndex = '60'; // Default z-index
-        }
+        // Set z-index based on open modals
+        contextMenu.style.zIndex = this.getContextMenuZIndex().toString();
         
         contextMenu.style.left = `${event.pageX}px`;
         contextMenu.style.top = `${event.pageY}px`;
@@ -1305,13 +1326,8 @@ class BookmarkManager {
         document.getElementById('editBookmarkTitle').value = bookmark.title;
         document.getElementById('editBookmarkUrl').value = bookmark.url;
         
-        // Set higher z-index if folder modal is open
-        const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
-        if (folderModalOpen) {
-            modal.style.zIndex = '70'; // Higher than folder modal's z-50
-        } else {
-            modal.style.zIndex = '60'; // Default z-index
-        }
+        // Set z-index based on open modals
+        modal.style.zIndex = this.getContextMenuZIndex().toString();
         
         // Position the modal near the bookmark being edited
         this.positionEditModal(modal);
@@ -1339,13 +1355,8 @@ class BookmarkManager {
         document.getElementById('editBookmarkTitle').value = bookmark.title;
         document.getElementById('editBookmarkUrl').value = bookmark.url;
         
-        // Set higher z-index if folder modal is open
-        const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
-        if (folderModalOpen) {
-            modal.style.zIndex = '70'; // Higher than folder modal's z-50
-        } else {
-            modal.style.zIndex = '60'; // Default z-index
-        }
+        // Set z-index based on open modals
+        modal.style.zIndex = this.getContextMenuZIndex().toString();
         
         // Position the modal near the bookmark being duplicated
         this.positionEditModal(modal);
@@ -2015,13 +2026,8 @@ class BookmarkManager {
         document.getElementById('renameFolder').classList.remove('hidden');
         document.getElementById('deleteFolder').classList.remove('hidden');
         
-        // Set higher z-index if folder modal is open
-        const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
-        if (folderModalOpen) {
-            contextMenu.style.zIndex = '70'; // Higher than folder modal's z-50
-        } else {
-            contextMenu.style.zIndex = '60'; // Default z-index
-        }
+        // Set z-index based on open modals
+        contextMenu.style.zIndex = this.getContextMenuZIndex().toString();
         
         contextMenu.style.left = `${event.pageX}px`;
         contextMenu.style.top = `${event.pageY}px`;
