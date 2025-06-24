@@ -1691,23 +1691,16 @@ class BookmarkManager {
         const quickAccess = document.getElementById('quickAccess');
         const folderBookmarks = document.getElementById('folderBookmarks');
         
-        // Remove all existing grid classes
-        quickAccess.className = quickAccess.className.replace(/grid-cols-\d+/g, '');
+        // Set CSS custom property for tile width
+        document.documentElement.style.setProperty('--tiles-per-row', tilesPerRow);
+        
+        // Ensure both containers use flexbox with wrapping and centering
+        quickAccess.classList.remove('grid', 'place-content-center');
+        quickAccess.classList.add('flex', 'flex-wrap', 'justify-center', 'gap-4');
+        
         if (folderBookmarks) {
-            folderBookmarks.className = folderBookmarks.className.replace(/grid-cols-\d+/g, '');
-        }
-        
-        // Add new grid class based on tilesPerRow value
-        const gridClass = `grid-cols-${tilesPerRow}`;
-        
-        // Update quickAccess layout
-        quickAccess.classList.remove('flex', 'flex-wrap', 'justify-center');
-        quickAccess.classList.add('grid', gridClass, 'gap-4', 'justify-items-center', 'place-content-center');
-        
-        // Update folderBookmarks layout if it exists
-        if (folderBookmarks) {
-            folderBookmarks.classList.remove('flex', 'flex-wrap', 'justify-center');
-            folderBookmarks.classList.add('grid', gridClass, 'gap-6', 'justify-items-center', 'place-content-center');
+            folderBookmarks.classList.remove('grid', 'place-content-center');
+            folderBookmarks.classList.add('flex', 'flex-wrap', 'justify-center', 'gap-6');
         }
     }
 
