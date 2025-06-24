@@ -1425,6 +1425,11 @@ class BookmarkManager {
         await this.saveBookmarks();
         this.renderQuickAccess();
         
+        // If we're in a folder modal, also update the folder view
+        if (this.openFolderId && bookmark.folderId === this.openFolderId) {
+            this.renderFolderBookmarks(this.openFolderId);
+        }
+        
         this.currentBookmarkId = duplicatedBookmark.id;
         this.isDuplicateMode = true;
         this.duplicatedBookmarkId = duplicatedBookmark.id;
