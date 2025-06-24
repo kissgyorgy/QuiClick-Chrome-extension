@@ -1702,12 +1702,12 @@ class BookmarkManager {
         
         // Update quickAccess layout
         quickAccess.classList.remove('flex', 'flex-wrap', 'justify-center');
-        quickAccess.classList.add('grid', gridClass, 'gap-4', 'justify-items-center');
+        quickAccess.classList.add('grid', gridClass, 'gap-4', 'justify-items-center', 'place-content-center');
         
         // Update folderBookmarks layout if it exists
         if (folderBookmarks) {
             folderBookmarks.classList.remove('flex', 'flex-wrap', 'justify-center');
-            folderBookmarks.classList.add('grid', gridClass, 'gap-6', 'justify-items-center');
+            folderBookmarks.classList.add('grid', gridClass, 'gap-6', 'justify-items-center', 'place-content-center');
         }
     }
 
