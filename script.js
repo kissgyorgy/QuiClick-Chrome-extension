@@ -109,6 +109,7 @@ class BookmarkManager {
                 this.hideSettingsModal();
                 this.closeFolderModal();
                 this.hideCreateFolderModal();
+                this.hideRenameFolderModal();
             }
         });
 
@@ -199,6 +200,33 @@ class BookmarkManager {
             }
         });
 
+        // Folder context menu events
+        document.getElementById('renameFolder').addEventListener('click', () => {
+            this.showRenameFolderModal();
+            this.hideContextMenu();
+        });
+
+        document.getElementById('deleteFolder').addEventListener('click', () => {
+            this.deleteFolderWithBookmarks();
+            this.hideContextMenu();
+        });
+
+        // Rename folder modal events
+        document.getElementById('cancelRenameFolderBtn').addEventListener('click', () => {
+            this.hideRenameFolderModal();
+        });
+
+        document.getElementById('renameFolderForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.renameFolderFromModal();
+        });
+
+        document.getElementById('renameFolderModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                this.hideRenameFolderModal();
+            }
+        });
+
 
         // Toggle switch styling
         document.getElementById('showTitles').addEventListener('change', (e) => {
@@ -213,7 +241,8 @@ class BookmarkManager {
                                       e.target.closest('#addBookmarkModal') ||
                                       e.target.closest('#settingsModal') ||
                                       e.target.closest('#folderModal') ||
-                                      e.target.closest('#createFolderModal');
+                                      e.target.closest('#createFolderModal') ||
+                                      e.target.closest('#renameFolderModal');
             
             if (!isClickInsideModal) {
                 this.hideContextMenu();
@@ -224,8 +253,9 @@ class BookmarkManager {
                 const settingsModalOpen = !document.getElementById('settingsModal').classList.contains('hidden');
                 const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
                 const createFolderModalOpen = !document.getElementById('createFolderModal').classList.contains('hidden');
+                const renameFolderModalOpen = !document.getElementById('renameFolderModal').classList.contains('hidden');
                 
-                if (!editModalOpen && !addModalOpen && !settingsModalOpen && !folderModalOpen && !createFolderModalOpen) {
+                if (!editModalOpen && !addModalOpen && !settingsModalOpen && !folderModalOpen && !createFolderModalOpen && !renameFolderModalOpen) {
                     console.log('Clearing currentBookmarkId due to click outside');
                     this.currentBookmarkId = null;
                 }
@@ -1080,10 +1110,10 @@ class BookmarkManager {
                     this.openFolder(folder.id);
                 });
                 
-                // Right click - show folder context menu (for future implementation)
+                // Right click - show folder context menu
                 folderElement.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
-                    // TODO: Add folder context menu
+                    this.showFolderContextMenu(e, folder.id);
                 });
 
                 // Drag over - accept bookmarks
@@ -1185,6 +1215,13 @@ class BookmarkManager {
         this.currentBookmarkId = bookmarkId;
         const contextMenu = document.getElementById('contextMenu');
         
+        // Show bookmark menu items and hide folder menu items
+        document.getElementById('editBookmark').classList.remove('hidden');
+        document.getElementById('duplicateBookmark').classList.remove('hidden');
+        document.getElementById('deleteBookmark').classList.remove('hidden');
+        document.getElementById('renameFolder').classList.add('hidden');
+        document.getElementById('deleteFolder').classList.add('hidden');
+        
         // Set higher z-index if folder modal is open
         const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
         if (folderModalOpen) {
@@ -1216,6 +1253,8 @@ class BookmarkManager {
         // Reset z-index to default
         contextMenu.style.zIndex = '50';
         // Don't clear currentBookmarkId here as it's needed for edit/delete operations
+        // But clear currentFolderId when hiding context menu
+        this.currentFolderId = null;
     }
 
     showEditBookmarkModal() {
@@ -1817,6 +1856,106 @@ class BookmarkManager {
         
         await this.createFolder(folderName);
         this.hideCreateFolderModal();
+    }
+
+    showFolderContextMenu(event, folderId) {
+        console.log('showFolderContextMenu called with folderId:', folderId);
+        this.currentFolderId = folderId;
+        const contextMenu = document.getElementById('contextMenu');
+        
+        // Hide bookmark menu items and show folder menu items
+        document.getElementById('editBookmark').classList.add('hidden');
+        document.getElementById('duplicateBookmark').classList.add('hidden');
+        document.getElementById('deleteBookmark').classList.add('hidden');
+        document.getElementById('renameFolder').classList.remove('hidden');
+        document.getElementById('deleteFolder').classList.remove('hidden');
+        
+        // Set higher z-index if folder modal is open
+        const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
+        if (folderModalOpen) {
+            contextMenu.style.zIndex = '60'; // Higher than folder modal's z-50
+        } else {
+            contextMenu.style.zIndex = '50'; // Default z-index
+        }
+        
+        contextMenu.style.left = `${event.pageX}px`;
+        contextMenu.style.top = `${event.pageY}px`;
+        contextMenu.classList.remove('hidden');
+        
+        // Adjust position if menu goes off screen
+        const rect = contextMenu.getBoundingClientRect();
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        
+        if (rect.right > windowWidth) {
+            contextMenu.style.left = `${event.pageX - rect.width}px`;
+        }
+        if (rect.bottom > windowHeight) {
+            contextMenu.style.top = `${event.pageY - rect.height}px`;
+        }
+    }
+
+    showRenameFolderModal() {
+        const folder = this.folders.find(f => f.id === this.currentFolderId);
+        if (!folder) return;
+        
+        document.getElementById('renameFolderName').value = folder.name;
+        document.getElementById('renameFolderModal').classList.remove('hidden');
+        document.getElementById('renameFolderName').focus();
+        document.getElementById('renameFolderName').select();
+    }
+
+    hideRenameFolderModal() {
+        document.getElementById('renameFolderModal').classList.add('hidden');
+        document.getElementById('renameFolderForm').reset();
+    }
+
+    async renameFolderFromModal() {
+        const newName = document.getElementById('renameFolderName').value.trim();
+        if (!newName || !this.currentFolderId) return;
+        
+        const folder = this.folders.find(f => f.id === this.currentFolderId);
+        if (!folder) return;
+        
+        folder.name = newName;
+        await this.saveBookmarks();
+        this.renderQuickAccess();
+        
+        // Update folder modal title if the folder modal is open for this folder
+        if (this.openFolderId === this.currentFolderId) {
+            document.getElementById('folderModalTitle').textContent = newName;
+        }
+        
+        this.hideRenameFolderModal();
+        this.currentFolderId = null;
+    }
+
+    async deleteFolderWithBookmarks() {
+        if (!this.currentFolderId) return;
+        
+        const folder = this.folders.find(f => f.id === this.currentFolderId);
+        if (!folder) return;
+        
+        // Move all bookmarks in this folder back to main view
+        this.bookmarks.forEach(bookmark => {
+            if (bookmark.folderId === this.currentFolderId) {
+                bookmark.folderId = null; // Remove from folder
+            }
+        });
+        
+        // Remove the folder
+        this.folders = this.folders.filter(f => f.id !== this.currentFolderId);
+        
+        // Save changes
+        await this.saveBookmarks();
+        this.renderQuickAccess();
+        
+        // Close folder modal if this folder was open
+        if (this.openFolderId === this.currentFolderId) {
+            this.closeFolderModal();
+        }
+        
+        this.currentFolderId = null;
     }
 
     setupFolderDragAndDrop() {
