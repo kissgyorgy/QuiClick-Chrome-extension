@@ -27,8 +27,8 @@ class BookmarkManager {
         await this.loadBookmarks();
         await this.loadFolders();
         this.setupEventListeners();
-        this.renderQuickAccess();
         this.updateTilesPerRowCSS(this.settings.tilesPerRow);
+        this.renderQuickAccess();
     }
 
     async checkSyncAvailability() {
