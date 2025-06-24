@@ -1305,6 +1305,14 @@ class BookmarkManager {
         document.getElementById('editBookmarkTitle').value = bookmark.title;
         document.getElementById('editBookmarkUrl').value = bookmark.url;
         
+        // Set higher z-index if folder modal is open
+        const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
+        if (folderModalOpen) {
+            modal.style.zIndex = '70'; // Higher than folder modal's z-50
+        } else {
+            modal.style.zIndex = '60'; // Default z-index
+        }
+        
         // Position the modal near the bookmark being edited
         this.positionEditModal(modal);
         
@@ -1331,6 +1339,14 @@ class BookmarkManager {
         document.getElementById('editBookmarkTitle').value = bookmark.title;
         document.getElementById('editBookmarkUrl').value = bookmark.url;
         
+        // Set higher z-index if folder modal is open
+        const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
+        if (folderModalOpen) {
+            modal.style.zIndex = '70'; // Higher than folder modal's z-50
+        } else {
+            modal.style.zIndex = '60'; // Default z-index
+        }
+        
         // Position the modal near the bookmark being duplicated
         this.positionEditModal(modal);
         
@@ -1342,7 +1358,10 @@ class BookmarkManager {
         // Remove highlighting
         this.removeBookmarkHighlight();
         
-        document.getElementById('editBookmarkModal').classList.add('hidden');
+        const modal = document.getElementById('editBookmarkModal');
+        modal.classList.add('hidden');
+        // Reset z-index to default
+        modal.style.zIndex = '60';
         document.getElementById('editBookmarkForm').reset();
         this.currentBookmarkId = null;
         this.isDuplicateMode = false;
