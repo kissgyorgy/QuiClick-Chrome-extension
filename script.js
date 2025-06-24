@@ -1691,19 +1691,37 @@ class BookmarkManager {
         const quickAccess = document.getElementById('quickAccess');
         const folderBookmarks = document.getElementById('folderBookmarks');
         
+        // Map tiles per row to appropriate existing TailwindCSS max-width classes
+        const maxWidthClasses = {
+            3: 'max-w-sm',    // ~24rem
+            4: 'max-w-md',    // ~28rem  
+            5: 'max-w-lg',    // ~32rem
+            6: 'max-w-xl',    // ~36rem
+            7: 'max-w-2xl',   // ~42rem
+            8: 'max-w-3xl',   // ~48rem
+            9: 'max-w-4xl',   // ~56rem
+            10: 'max-w-5xl',  // ~64rem
+            11: 'max-w-6xl',  // ~72rem
+            12: 'max-w-7xl',  // ~80rem
+            13: 'max-w-7xl',  // ~80rem
+            14: 'max-w-7xl',  // ~80rem
+            15: 'max-w-7xl'   // ~80rem
+        };
+        
         // Clear all classes and rebuild with only what we need
         quickAccess.className = '';
         
         // Add new grid class based on tilesPerRow value
         const gridClass = `grid-cols-${tilesPerRow}`;
+        const maxWidthClass = maxWidthClasses[tilesPerRow];
         
         // Update quickAccess layout - clean slate with only necessary classes
-        quickAccess.classList.add('grid', gridClass, 'gap-2', 'w-fit', 'mx-auto');
+        quickAccess.classList.add('grid', gridClass, 'gap-2', maxWidthClass, 'mx-auto');
         
         // Update folderBookmarks layout if it exists
         if (folderBookmarks) {
             folderBookmarks.className = '';
-            folderBookmarks.classList.add('grid', gridClass, 'gap-2', 'w-fit', 'mx-auto');
+            folderBookmarks.classList.add('grid', gridClass, 'gap-2', maxWidthClass, 'mx-auto');
         }
     }
 
