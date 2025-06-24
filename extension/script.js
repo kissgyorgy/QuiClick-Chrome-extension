@@ -253,6 +253,7 @@ class BookmarkManager {
                                       e.target.closest('#deleteConfirmPopup') ||
                                       e.target.closest('#addBookmarkModal') ||
                                       e.target.closest('#settingsModal') ||
+                                      e.target.closest('#settingsBtn') ||
                                       e.target.closest('#folderModal') ||
                                       e.target.closest('#createFolderModal') ||
                                       e.target.closest('#renameFolderModal');
