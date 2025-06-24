@@ -15,7 +15,8 @@ class BookmarkManager {
         this.syncAvailable = false;
         this.settings = {
             showTitles: true,
-            tilesPerRow: 8
+            tilesPerRow: 8,
+            tileGap: 2
         };
         this.init();
     }
@@ -234,6 +235,15 @@ class BookmarkManager {
             this.settings.tilesPerRow = value;
             this.saveSettings();
             this.updateTilesPerRowCSS(value);
+        });
+
+        // Tile gap slider
+        document.getElementById('tileGap').addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            document.getElementById('tileGapValue').textContent = value;
+            this.settings.tileGap = value;
+            this.saveSettings();
+            this.updateTilesPerRowCSS(this.settings.tilesPerRow);
         });
 
         // Hide context menu when clicking elsewhere
@@ -1647,11 +1657,9 @@ class BookmarkManager {
 
     showSettingsModal() {
         const modal = document.getElementById('settingsModal');
-        const showTitlesToggle = document.getElementById('showTitles');
         
         // Load current settings into the modal
-        showTitlesToggle.checked = this.settings.showTitles;
-        this.updateToggleVisual(showTitlesToggle);
+        this.loadCurrentSettingsIntoForm();
         
         // Update sync status in settings modal
         this.updateSettingsSyncStatus();
@@ -1673,12 +1681,17 @@ class BookmarkManager {
         const showTitlesToggle = document.getElementById('showTitles');
         const tilesPerRowSlider = document.getElementById('tilesPerRow');
         const tilesPerRowValue = document.getElementById('tilesPerRowValue');
+        const tileGapSlider = document.getElementById('tileGap');
+        const tileGapValue = document.getElementById('tileGapValue');
         
         showTitlesToggle.checked = this.settings.showTitles;
         this.updateToggleVisual(showTitlesToggle);
         
         tilesPerRowSlider.value = this.settings.tilesPerRow;
         tilesPerRowValue.textContent = this.settings.tilesPerRow;
+        
+        tileGapSlider.value = this.settings.tileGap;
+        tileGapValue.textContent = this.settings.tileGap;
     }
 
     async saveSettings() {
@@ -1714,13 +1727,16 @@ class BookmarkManager {
         const gridClass = `grid-cols-${tilesPerRow}`;
         const maxWidthClass = maxWidthClasses[tilesPerRow];
         
+        // Get gap class based on setting
+        const gapClass = `gap-${this.settings.tileGap}`;
+        
         // Update quickAccess layout - clean slate with only necessary classes
-        quickAccess.classList.add('grid', gridClass, 'gap-2', maxWidthClass, 'mx-auto');
+        quickAccess.classList.add('grid', gridClass, gapClass, maxWidthClass, 'mx-auto');
         
         // Update folderBookmarks layout if it exists
         if (folderBookmarks) {
             folderBookmarks.className = '';
-            folderBookmarks.classList.add('grid', gridClass, 'gap-2', maxWidthClass, 'mx-auto');
+            folderBookmarks.classList.add('grid', gridClass, gapClass, maxWidthClass, 'mx-auto');
         }
     }
 
