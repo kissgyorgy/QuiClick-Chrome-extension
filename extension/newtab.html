@@ -156,8 +156,7 @@
             <h3 class="text-lg font-semibold text-custom-text mb-4">Create New Folder</h3>
             <form id="createFolderForm">
                 <div class="mb-6">
-                    <label class="block text-sm font-medium text-custom-text mb-2">Folder Name</label>
-                    <input type="text" id="folderName" class="w-full px-3 py-2 border border-custom-border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent" autocomplete="off" required placeholder="Enter folder name">
+                    <input type="text" id="folderName" class="w-full px-3 py-2 border border-custom-border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent" autocomplete="off" required>
                 </div>
                 <div class="flex space-x-3">
                     <button type="button" id="cancelCreateFolderBtn" class="flex-1 px-3 py-2 border border-custom-border rounded-lg text-custom-text hover:bg-gray-50 transition-colors cursor-pointer font-bold text-sm">Cancel</button>
@@ -173,8 +172,7 @@
             <h3 class="text-lg font-semibold text-custom-text mb-4">Rename Folder</h3>
             <form id="renameFolderForm">
                 <div class="mb-6">
-                    <label class="block text-sm font-medium text-custom-text mb-2">Folder Name</label>
-                    <input type="text" id="renameFolderName" class="w-full px-3 py-2 border border-custom-border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent" autocomplete="off" required placeholder="Enter new folder name">
+                    <input type="text" id="renameFolderName" class="w-full px-3 py-2 border border-custom-border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent" autocomplete="off" required>
                 </div>
                 <div class="flex space-x-3">
                     <button type="button" id="cancelRenameFolderBtn" class="flex-1 px-3 py-2 border border-custom-border rounded-lg text-custom-text hover:bg-gray-50 transition-colors cursor-pointer font-bold text-sm">Cancel</button>
@@ -186,7 +184,7 @@
 
     <!-- Folder Modal -->
     <div id="folderModal" class="modal-backdrop fixed inset-0 hidden flex items-center justify-center z-50">
-        <div class="modal-content rounded-xl w-auto max-w-6xl min-w-[800px] mx-4 max-h-[85vh] overflow-hidden">
+        <div class="modal-content rounded-xl w-auto max-w-6xl min-w-[800px] mx-4 max-h-[90vh] overflow-hidden">
             <!-- Header with centered title and close button -->
             <div class="relative border-b border-gray-200 px-8 py-6 bg-gradient-to-r from-amber-50 to-yellow-50">
                 <h3 id="folderModalTitle" class="text-2xl font-bold text-gray-800 text-center">Folder Name</h3>
@@ -197,7 +195,7 @@
                 </button>
             </div>
             <!-- Content area -->
-            <div class="p-8 overflow-y-auto max-h-[calc(85vh-120px)]">
+            <div class="p-8 overflow-y-auto max-h-[calc(90vh-120px)]">
                 <div id="folderBookmarks" class="flex flex-wrap justify-center gap-6">
                     <!-- Folder bookmarks will be populated by JavaScript -->
                 </div>
