@@ -1714,21 +1714,41 @@ class BookmarkManager {
             9: 'max-w-4xl',   // ~56rem
             10: 'max-w-5xl',  // ~64rem
             11: 'max-w-6xl',  // ~72rem
-            12: 'max-w-7xl',  // ~80rem
-            13: 'max-w-7xl',  // ~80rem
-            14: 'max-w-7xl',  // ~80rem
-            15: 'max-w-7xl'   // ~80rem
+            12: 'max-w-7xl'   // ~80rem
         };
         
         // Clear all classes and rebuild with only what we need
         quickAccess.className = '';
         
-        // Add new grid class based on tilesPerRow value
-        const gridClass = `grid-cols-${tilesPerRow}`;
+        // Add new grid class based on tilesPerRow value - explicit mapping for Tailwind compilation
+        const gridClasses = {
+            3: 'grid-cols-3',
+            4: 'grid-cols-4',
+            5: 'grid-cols-5',
+            6: 'grid-cols-6',
+            7: 'grid-cols-7',
+            8: 'grid-cols-8',
+            9: 'grid-cols-9',
+            10: 'grid-cols-10',
+            11: 'grid-cols-11',
+            12: 'grid-cols-12'
+        };
+        const gridClass = gridClasses[tilesPerRow] || 'grid-cols-8';
         const maxWidthClass = maxWidthClasses[tilesPerRow];
         
-        // Get gap class based on setting
-        const gapClass = `gap-${this.settings.tileGap}`;
+        // Get gap class based on setting - explicit mapping for Tailwind compilation
+        const gapClasses = {
+            0: 'gap-0',
+            1: 'gap-1',
+            2: 'gap-2',
+            3: 'gap-3',
+            4: 'gap-4',
+            5: 'gap-5',
+            6: 'gap-6',
+            7: 'gap-7',
+            8: 'gap-8'
+        };
+        const gapClass = gapClasses[this.settings.tileGap] || 'gap-2';
         
         // Update quickAccess layout - clean slate with only necessary classes
         quickAccess.classList.add('grid', gridClass, gapClass, maxWidthClass, 'mx-auto');
