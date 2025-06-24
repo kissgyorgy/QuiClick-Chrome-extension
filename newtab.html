@@ -154,20 +154,18 @@
     </div>
 
     <!-- Folder Modal -->
-    <div id="folderModal" class="fixed inset-0 hidden bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300">
-        <div class="bg-white rounded-xl shadow-2xl max-w-4xl max-h-[80vh] w-full mx-4 overflow-hidden">
-            <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                <h2 id="folderModalTitle" class="text-xl font-semibold text-gray-800 text-center flex-1">Folder Name</h2>
+    <div id="folderModal" class="modal-backdrop fixed inset-0 hidden flex items-center justify-center z-50">
+        <div class="modal-content rounded-xl p-6 w-auto max-w-4xl mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="folderModalTitle" class="text-lg font-semibold text-custom-text">Folder Name</h3>
                 <button id="closeFolderBtn" class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                 </button>
             </div>
-            <div class="p-6 overflow-y-auto">
-                <div id="folderBookmarks" class="flex flex-wrap justify-center gap-4">
-                    <!-- Folder bookmarks will be populated by JavaScript -->
-                </div>
+            <div id="folderBookmarks" class="flex flex-wrap justify-center gap-4">
+                <!-- Folder bookmarks will be populated by JavaScript -->
             </div>
         </div>
     </div>
