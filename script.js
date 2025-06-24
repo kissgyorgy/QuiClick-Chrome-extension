@@ -1504,7 +1504,27 @@ class BookmarkManager {
             this.currentBookmarkId = null;
         } else if (this.currentFolderId) {
             // Delete folder
-            await this.deleteFolderWithBookmarks();
+            this.removeFolderDeleteHighlight();
+            
+            // Move all bookmarks in this folder back to main view
+            this.bookmarks.forEach(bookmark => {
+                if (bookmark.folderId === this.currentFolderId) {
+                    bookmark.folderId = null; // Remove from folder
+                }
+            });
+            
+            // Close folder modal if this folder was open
+            if (this.openFolderId === this.currentFolderId) {
+                this.closeFolderModal();
+            }
+            
+            // Remove the folder
+            this.folders = this.folders.filter(f => f.id !== this.currentFolderId);
+            
+            // Save changes and update UI
+            await this.saveBookmarks();
+            this.renderQuickAccess();
+            this.currentFolderId = null;
         }
     }
 
