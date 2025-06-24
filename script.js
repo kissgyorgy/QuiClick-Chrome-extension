@@ -1440,6 +1440,13 @@ class BookmarkManager {
         await this.saveBookmarks();
         console.log('Rendering...');
         this.renderQuickAccess();
+        
+        // If we're in a folder modal and the edited bookmark is in that folder, update the folder view
+        const editedBookmark = this.bookmarks[bookmarkIndex];
+        if (this.openFolderId && editedBookmark && editedBookmark.folderId === this.openFolderId) {
+            this.renderFolderBookmarks(this.openFolderId);
+        }
+        
         console.log('Hiding modal...');
         this.hideEditBookmarkModal();
         
@@ -1582,9 +1589,19 @@ class BookmarkManager {
         if (this.currentBookmarkId) {
             // Delete bookmark
             this.removeDeleteHighlight();
+            
+            // Get the bookmark before deleting to check if it was in a folder
+            const deletedBookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
+            
             this.bookmarks = this.bookmarks.filter(b => b.id !== this.currentBookmarkId);
             await this.saveBookmarks();
             this.renderQuickAccess();
+            
+            // If we're in a folder modal and the deleted bookmark was in that folder, update the folder view
+            if (this.openFolderId && deletedBookmark && deletedBookmark.folderId === this.openFolderId) {
+                this.renderFolderBookmarks(this.openFolderId);
+            }
+            
             this.currentBookmarkId = null;
         } else if (this.currentFolderId) {
             // Delete folder
