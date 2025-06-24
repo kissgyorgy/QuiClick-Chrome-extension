@@ -1751,12 +1751,12 @@ class BookmarkManager {
         const gapClass = gapClasses[this.settings.tileGap] || 'gap-2';
         
         // Update quickAccess layout - clean slate with only necessary classes
-        quickAccess.classList.add('grid', gridClass, gapClass, maxWidthClass, 'mx-auto');
+        quickAccess.classList.add('grid', gridClass, gapClass, maxWidthClass, 'mx-auto', 'place-items-center');
         
         // Update folderBookmarks layout if it exists
         if (folderBookmarks) {
             folderBookmarks.className = '';
-            folderBookmarks.classList.add('grid', gridClass, gapClass, maxWidthClass, 'mx-auto');
+            folderBookmarks.classList.add('grid', gridClass, gapClass, maxWidthClass, 'mx-auto', 'place-items-center');
         }
     }
 
