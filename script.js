@@ -206,8 +206,8 @@ class BookmarkManager {
             this.hideContextMenu();
         });
 
-        document.getElementById('deleteFolder').addEventListener('click', () => {
-            this.deleteFolderWithBookmarks();
+        document.getElementById('deleteFolder').addEventListener('click', (e) => {
+            this.showFolderDeleteConfirmation(e);
             this.hideContextMenu();
         });
 
@@ -1487,21 +1487,25 @@ class BookmarkManager {
     }
     
     hideDeleteConfirmation() {
-        // Remove delete highlighting
+        // Remove delete highlighting for both bookmarks and folders
         this.removeDeleteHighlight();
+        this.removeFolderDeleteHighlight();
         document.getElementById('deleteConfirmPopup').classList.add('hidden');
     }
     
     async confirmDeleteBookmark() {
-        if (!this.currentBookmarkId) return;
-        
-        // Remove highlighting before deleting
-        this.removeDeleteHighlight();
-        
-        this.bookmarks = this.bookmarks.filter(b => b.id !== this.currentBookmarkId);
-        await this.saveBookmarks();
-        this.renderQuickAccess();
-        this.currentBookmarkId = null;
+        // Handle both bookmark and folder deletion
+        if (this.currentBookmarkId) {
+            // Delete bookmark
+            this.removeDeleteHighlight();
+            this.bookmarks = this.bookmarks.filter(b => b.id !== this.currentBookmarkId);
+            await this.saveBookmarks();
+            this.renderQuickAccess();
+            this.currentBookmarkId = null;
+        } else if (this.currentFolderId) {
+            // Delete folder
+            await this.deleteFolderWithBookmarks();
+        }
     }
 
     async deleteBookmark() {
@@ -1956,6 +1960,75 @@ class BookmarkManager {
         }
         
         this.currentFolderId = null;
+    }
+
+    showFolderDeleteConfirmation(event) {
+        if (!this.currentFolderId) return;
+        
+        const popup = document.getElementById('deleteConfirmPopup');
+        const folder = this.folders.find(f => f.id === this.currentFolderId);
+        
+        if (!folder) return;
+        
+        // Highlight the folder being deleted
+        this.highlightFolderForDeletion(this.currentFolderId);
+        
+        // Update the confirmation message with the folder name
+        const messageElement = document.getElementById('deleteConfirmMessage');
+        const bookmarkCount = this.bookmarks.filter(b => b.folderId === this.currentFolderId).length;
+        const bookmarkText = bookmarkCount === 1 ? 'bookmark' : 'bookmarks';
+        messageElement.innerHTML = `Are you sure you want to delete folder <strong>${folder.name}</strong>?<br><small class="text-gray-500">${bookmarkCount} ${bookmarkText} will be moved to the main view.</small>`;
+        
+        // Position the popup near the folder being deleted
+        const folderElement = document.querySelector(`[data-folder-id="${this.currentFolderId}"]`);
+        if (folderElement) {
+            const rect = folderElement.getBoundingClientRect();
+            const popupRect = popup.getBoundingClientRect();
+            
+            // Position popup to the right of the folder, or left if not enough space
+            let left = rect.right + 10;
+            let top = rect.top;
+            
+            // Check if popup would go off screen horizontally
+            if (left + 256 > window.innerWidth) { // 256px is popup width (w-64)
+                left = rect.left - 256 - 10;
+            }
+            
+            // Check if popup would go off screen vertically
+            if (top + 100 > window.innerHeight) { // Approximate popup height
+                top = rect.bottom - 100;
+            }
+            
+            // Ensure popup doesn't go above viewport
+            if (top < 0) {
+                top = 10;
+            }
+            
+            popup.style.left = `${left}px`;
+            popup.style.top = `${top}px`;
+        }
+        
+        popup.classList.remove('hidden');
+    }
+
+    highlightFolderForDeletion(folderId) {
+        // Remove any existing highlights
+        this.removeBookmarkHighlight();
+        this.removeDeleteHighlight();
+        this.removeFolderDeleteHighlight();
+        
+        // Add delete highlight to the current folder
+        const folderElement = document.querySelector(`[data-folder-id="${folderId}"]`);
+        if (folderElement) {
+            folderElement.classList.add('folder-delete-highlighted');
+        }
+    }
+
+    removeFolderDeleteHighlight() {
+        const deleteHighlightedElement = document.querySelector('.folder-delete-highlighted');
+        if (deleteHighlightedElement) {
+            deleteHighlightedElement.classList.remove('folder-delete-highlighted');
+        }
     }
 
     setupFolderDragAndDrop() {
