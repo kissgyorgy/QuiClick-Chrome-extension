@@ -1656,6 +1656,12 @@ class BookmarkManager {
         document.getElementById('folderModalTitle').textContent = folder.name;
         document.getElementById('folderModal').classList.remove('hidden');
         
+        // Store the current open folder ID
+        this.openFolderId = folderId;
+        
+        // Set up drag and drop for removing bookmarks from folder
+        this.setupFolderDragAndDrop();
+        
         // Render bookmarks in this folder
         this.renderFolderBookmarks(folderId);
     }
@@ -1663,6 +1669,7 @@ class BookmarkManager {
     closeFolderModal() {
         document.getElementById('folderModal').classList.add('hidden');
         this.openFolderId = null;
+        this.cleanupFolderDragAndDrop();
     }
 
     renderFolderBookmarks(folderId) {
@@ -1732,6 +1739,23 @@ class BookmarkManager {
                 this.showContextMenu(e, bookmark.id);
             });
 
+            // Drag start
+            bookmarkElement.addEventListener('dragstart', (e) => {
+                this.isDragging = true;
+                this.draggedBookmarkId = bookmark.id;
+                bookmarkElement.style.opacity = '0.5';
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', bookmarkElement.outerHTML);
+            });
+
+            // Drag end
+            bookmarkElement.addEventListener('dragend', (e) => {
+                this.isDragging = false;
+                this.draggedBookmarkId = null;
+                bookmarkElement.style.opacity = '1';
+                this.removeFolderDragIndicator();
+            });
+
             // Handle favicon error
             const faviconImg = bookmarkElement.querySelector('.bookmark-favicon');
             const fallbackDiv = bookmarkElement.querySelector('.bookmark-fallback');
@@ -1783,6 +1807,116 @@ class BookmarkManager {
         
         await this.createFolder(folderName);
         this.hideCreateFolderModal();
+    }
+
+    setupFolderDragAndDrop() {
+        const folderModal = document.getElementById('folderModal');
+        const modalBackdrop = folderModal; // The backdrop is the modal itself
+        let dragCounter = 0;
+        
+        // Store event handlers for cleanup
+        this.folderDragHandlers = {};
+        
+        // Handle drag enter on the backdrop (outside the modal content)
+        this.folderDragHandlers.dragenter = (e) => {
+            // Only handle if dragging from within folder and target is backdrop
+            if (this.draggedBookmarkId && e.target === modalBackdrop) {
+                e.preventDefault();
+                dragCounter++;
+                this.showFolderDragIndicator();
+            }
+        };
+        
+        // Handle drag over
+        this.folderDragHandlers.dragover = (e) => {
+            if (this.draggedBookmarkId && e.target === modalBackdrop) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            }
+        };
+        
+        // Handle drag leave
+        this.folderDragHandlers.dragleave = (e) => {
+            if (this.draggedBookmarkId && e.target === modalBackdrop) {
+                e.preventDefault();
+                dragCounter--;
+                if (dragCounter === 0) {
+                    this.removeFolderDragIndicator();
+                }
+            }
+        };
+        
+        // Handle drop on backdrop
+        this.folderDragHandlers.drop = (e) => {
+            if (this.draggedBookmarkId && e.target === modalBackdrop) {
+                e.preventDefault();
+                dragCounter = 0;
+                this.removeFolderDragIndicator();
+                this.removeBookmarkFromFolder(this.draggedBookmarkId);
+            }
+        };
+        
+        // Add event listeners
+        modalBackdrop.addEventListener('dragenter', this.folderDragHandlers.dragenter);
+        modalBackdrop.addEventListener('dragover', this.folderDragHandlers.dragover);
+        modalBackdrop.addEventListener('dragleave', this.folderDragHandlers.dragleave);
+        modalBackdrop.addEventListener('drop', this.folderDragHandlers.drop);
+    }
+
+    cleanupFolderDragAndDrop() {
+        if (!this.folderDragHandlers) return;
+        
+        const folderModal = document.getElementById('folderModal');
+        
+        // Remove all event listeners
+        folderModal.removeEventListener('dragenter', this.folderDragHandlers.dragenter);
+        folderModal.removeEventListener('dragover', this.folderDragHandlers.dragover);
+        folderModal.removeEventListener('dragleave', this.folderDragHandlers.dragleave);
+        folderModal.removeEventListener('drop', this.folderDragHandlers.drop);
+        
+        this.folderDragHandlers = null;
+        this.removeFolderDragIndicator();
+    }
+
+    showFolderDragIndicator() {
+        const folderModal = document.getElementById('folderModal');
+        folderModal.classList.add('bg-blue-100/20');
+        
+        // Add visual indicator
+        if (!document.getElementById('folderDragIndicator')) {
+            const indicator = document.createElement('div');
+            indicator.id = 'folderDragIndicator';
+            indicator.className = 'fixed inset-0 pointer-events-none flex items-center justify-center z-50';
+            indicator.innerHTML = `
+                <div class="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg text-lg font-semibold">
+                    Drop here to remove from folder
+                </div>
+            `;
+            document.body.appendChild(indicator);
+        }
+    }
+
+    removeFolderDragIndicator() {
+        const folderModal = document.getElementById('folderModal');
+        folderModal.classList.remove('bg-blue-100/20');
+        
+        const indicator = document.getElementById('folderDragIndicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+
+    async removeBookmarkFromFolder(bookmarkId) {
+        const bookmark = this.bookmarks.find(b => b.id === bookmarkId);
+        if (!bookmark) return;
+        
+        // Remove from folder (set folderId to null)
+        bookmark.folderId = null;
+        await this.saveBookmarks();
+        
+        // Re-render both the folder contents and main view
+        this.renderFolderBookmarks(this.openFolderId);
+        this.renderQuickAccess();
     }
 
     // Removed unused bookmark card and list rendering methods
