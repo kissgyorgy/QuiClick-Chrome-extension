@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTab Bookmarks - Test Folders</title>
+    <link rel="stylesheet" href="../tailwind.css">
+</head>
+<body class="bg-custom-bg min-h-screen">
+    <!-- Header -->
+    <header class="bg-white border-b border-custom-border px-6 py-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-custom-accent rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/>
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold text-custom-text">YouTab Bookmarks - Test</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button id="createFolderBtn" class="bg-amber-500 text-white px-3 py-2 rounded-lg hover:bg-amber-600 transition-colors flex items-center space-x-2 cursor-pointer font-bold text-sm">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                    </svg>
+                    <span>Create Folder</span>
+                </button>
+                <button id="addBookmarkBtn" class="bg-custom-accent text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2 cursor-pointer font-bold text-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    <span>Add Bookmark</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <section>
+            <h2 class="text-lg font-semibold text-custom-text mb-6">Your Bookmarks</h2>
+            <div id="quickAccess" class="flex flex-wrap justify-center gap-4">
+                <!-- Test folder tile -->
+                <div class="tile w-24 h-24 relative bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 hover:shadow-md transition-all duration-200 cursor-pointer" 
+                     data-folder-id="test-folder" 
+                     draggable="false"
+                     title="Work Projects">
+                    <div class="tile-icon absolute inset-0 flex items-center justify-center pt-2 px-4 pb-6">
+                        <div class="w-full h-full bg-amber-500 rounded-lg flex items-center justify-center text-white">
+                            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="tile-title absolute bottom-1 left-1 right-1">
+                        <span class="text-xs text-gray-800 text-center block truncate">Work Projects</span>
+                    </div>
+                </div>
+                
+                <!-- Test bookmark tile -->
+                <div class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer" 
+                     data-bookmark-id="test-bookmark" 
+                     draggable="true"
+                     title="Google">
+                    <div class="tile-icon absolute inset-0 flex items-center justify-center pt-2 px-4 pb-6">
+                        <img alt="" src="https://www.google.com/s2/favicons?domain=google.com&sz=64" class="w-full h-full rounded-lg object-cover bookmark-favicon">
+                    </div>
+                    <div class="tile-title absolute bottom-1 left-1 right-1">
+                        <span class="text-xs text-gray-800 text-center block truncate">Google</span>
+                    </div>
+                </div>
+
+                <!-- Add button tile -->
+                <div id="addBookmarkTile" class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 border-dashed rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer" 
+                     title="Add New Bookmark">
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-custom-accent leading-none plus-icon">+</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        console.log('Folder test page loaded successfully!');
+        
+        // Test folder click
+        document.querySelector('[data-folder-id="test-folder"]').addEventListener('click', () => {
+            alert('Folder clicked! In the real extension, this would open the folder modal.');
+        });
+        
+        // Test drag and drop visual feedback
+        const folderElement = document.querySelector('[data-folder-id="test-folder"]');
+        const bookmarkElement = document.querySelector('[data-bookmark-id="test-bookmark"]');
+        
+        bookmarkElement.addEventListener('dragstart', (e) => {
+            console.log('Drag started on bookmark');
+            bookmarkElement.style.opacity = '0.5';
+        });
+        
+        bookmarkElement.addEventListener('dragend', (e) => {
+            console.log('Drag ended');
+            bookmarkElement.style.opacity = '1';
+        });
+        
+        folderElement.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            console.log('Dragging over folder');
+            folderElement.classList.add('bg-amber-200', 'border-amber-400');
+        });
+        
+        folderElement.addEventListener('dragleave', (e) => {
+            console.log('Drag left folder');
+            folderElement.classList.remove('bg-amber-200', 'border-amber-400');
+        });
+        
+        folderElement.addEventListener('drop', (e) => {
+            e.preventDefault();
+            console.log('Dropped on folder!');
+            folderElement.classList.remove('bg-amber-200', 'border-amber-400');
+            alert('Bookmark dropped on folder! In the real extension, this would move the bookmark.');
+        });
+    </script>
+</body>
+</html>

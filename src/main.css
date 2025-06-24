@@ -7,6 +7,20 @@
   --color-custom-accent: #3b82f6;
 }
 
+/* Additional grid column classes for tiles per row setting */
+.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.grid-cols-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.grid-cols-8 { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+.grid-cols-9 { grid-template-columns: repeat(9, minmax(0, 1fr)); }
+.grid-cols-10 { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+.grid-cols-11 { grid-template-columns: repeat(11, minmax(0, 1fr)); }
+.grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
+.grid-cols-13 { grid-template-columns: repeat(13, minmax(0, 1fr)); }
+.grid-cols-14 { grid-template-columns: repeat(14, minmax(0, 1fr)); }
+.grid-cols-15 { grid-template-columns: repeat(15, minmax(0, 1fr)); }
+
 .plus-icon {
   font-size: 4rem;
   line-height: 1;

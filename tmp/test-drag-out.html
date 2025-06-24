@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Drag Out of Folder</title>
+    <link rel="stylesheet" href="../tailwind.css">
+</head>
+<body class="bg-custom-bg min-h-screen">
+    <div class="p-8">
+        <h1 class="text-2xl font-bold mb-4">Test Drag Out of Folder</h1>
+        
+        <!-- Button to open folder modal -->
+        <button id="openFolderBtn" class="bg-amber-500 text-white px-4 py-2 rounded-lg mb-4">
+            Open Test Folder
+        </button>
+        
+        <!-- Folder Modal (similar to actual implementation) -->
+        <div id="folderModal" class="modal-backdrop fixed inset-0 hidden flex items-center justify-center z-50">
+            <div class="modal-content rounded-xl p-6 w-auto max-w-4xl mx-4 max-h-[80vh] overflow-y-auto">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-custom-text">Test Folder</h3>
+                    <button id="closeBtn" class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <!-- Test bookmark that can be dragged -->
+                    <div id="testBookmark" class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer" 
+                         draggable="true"
+                         title="Test Bookmark">
+                        <div class="tile-icon absolute inset-0 flex items-center justify-center pt-2 px-4 pb-6">
+                            <div class="w-full h-full bg-blue-500 rounded-lg flex items-center justify-center text-white text-2xl font-bold">
+                                T
+                            </div>
+                        </div>
+                        <div class="tile-title absolute bottom-1 left-1 right-1">
+                            <span class="text-xs text-gray-800 text-center block truncate">Test Bookmark</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isDragging = false;
+        let dragCounter = 0;
+        
+        const openBtn = document.getElementById('openFolderBtn');
+        const modal = document.getElementById('folderModal');
+        const closeBtn = document.getElementById('closeBtn');
+        const bookmark = document.getElementById('testBookmark');
+        
+        // Open modal
+        openBtn.addEventListener('click', () => {
+            modal.classList.remove('hidden');
+        });
+        
+        // Close modal
+        closeBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+        
+        // Close on backdrop click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+        
+        // Bookmark drag events
+        bookmark.addEventListener('dragstart', (e) => {
+            isDragging = true;
+            bookmark.style.opacity = '0.5';
+            console.log('Started dragging bookmark');
+        });
+        
+        bookmark.addEventListener('dragend', (e) => {
+            isDragging = false;
+            bookmark.style.opacity = '1';
+            console.log('Stopped dragging bookmark');
+        });
+        
+        // Modal drag events for dropping outside
+        modal.addEventListener('dragenter', (e) => {
+            if (isDragging && e.target === modal) {
+                e.preventDefault();
+                dragCounter++;
+                console.log('Drag entered modal backdrop');
+                modal.classList.add('bg-blue-100/20');
+                showDropIndicator();
+            }
+        });
+        
+        modal.addEventListener('dragover', (e) => {
+            if (isDragging && e.target === modal) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            }
+        });
+        
+        modal.addEventListener('dragleave', (e) => {
+            if (isDragging && e.target === modal) {
+                e.preventDefault();
+                dragCounter--;
+                if (dragCounter === 0) {
+                    console.log('Drag left modal backdrop');
+                    modal.classList.remove('bg-blue-100/20');
+                    hideDropIndicator();
+                }
+            }
+        });
+        
+        modal.addEventListener('drop', (e) => {
+            if (isDragging && e.target === modal) {
+                e.preventDefault();
+                dragCounter = 0;
+                console.log('Dropped on modal backdrop - removing from folder!');
+                modal.classList.remove('bg-blue-100/20');
+                hideDropIndicator();
+                alert('Bookmark removed from folder!');
+            }
+        });
+        
+        function showDropIndicator() {
+            if (!document.getElementById('dropIndicator')) {
+                const indicator = document.createElement('div');
+                indicator.id = 'dropIndicator';
+                indicator.className = 'fixed inset-0 pointer-events-none flex items-center justify-center z-50';
+                indicator.innerHTML = `
+                    <div class="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg text-lg font-semibold">
+                        Drop here to remove from folder
+                    </div>
+                `;
+                document.body.appendChild(indicator);
+            }
+        }
+        
+        function hideDropIndicator() {
+            const indicator = document.getElementById('dropIndicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+    </script>
+</body>
+</html>

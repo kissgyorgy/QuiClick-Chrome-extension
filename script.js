@@ -14,7 +14,8 @@ class BookmarkManager {
         this.faviconDebounceTimer = null;
         this.syncAvailable = false;
         this.settings = {
-            showTitles: true
+            showTitles: true,
+            tilesPerRow: 8
         };
         this.init();
     }
@@ -26,6 +27,7 @@ class BookmarkManager {
         await this.loadFolders();
         this.setupEventListeners();
         this.renderQuickAccess();
+        this.updateTilesPerRowCSS(this.settings.tilesPerRow);
     }
 
     async checkSyncAvailability() {
@@ -228,6 +230,15 @@ class BookmarkManager {
             this.settings.showTitles = e.target.checked;
             this.saveSettings();
             this.renderQuickAccess(); // Re-render to show/hide titles immediately
+        });
+
+        // Tiles per row slider
+        document.getElementById('tilesPerRow').addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            document.getElementById('tilesPerRowValue').textContent = value;
+            this.settings.tilesPerRow = value;
+            this.saveSettings();
+            this.updateTilesPerRowCSS(value);
         });
 
         // Hide context menu when clicking elsewhere
@@ -1661,14 +1672,43 @@ class BookmarkManager {
 
     loadCurrentSettingsIntoForm() {
         const showTitlesToggle = document.getElementById('showTitles');
+        const tilesPerRowSlider = document.getElementById('tilesPerRow');
+        const tilesPerRowValue = document.getElementById('tilesPerRowValue');
         
         showTitlesToggle.checked = this.settings.showTitles;
         this.updateToggleVisual(showTitlesToggle);
+        
+        tilesPerRowSlider.value = this.settings.tilesPerRow;
+        tilesPerRowValue.textContent = this.settings.tilesPerRow;
     }
 
     async saveSettings() {
         // Save current settings to storage
         await this.saveSettingsToStorage();
+    }
+
+    updateTilesPerRowCSS(tilesPerRow) {
+        const quickAccess = document.getElementById('quickAccess');
+        const folderBookmarks = document.getElementById('folderBookmarks');
+        
+        // Remove all existing grid classes
+        quickAccess.className = quickAccess.className.replace(/grid-cols-\d+/g, '');
+        if (folderBookmarks) {
+            folderBookmarks.className = folderBookmarks.className.replace(/grid-cols-\d+/g, '');
+        }
+        
+        // Add new grid class based on tilesPerRow value
+        const gridClass = `grid-cols-${tilesPerRow}`;
+        
+        // Update quickAccess layout
+        quickAccess.classList.remove('flex', 'flex-wrap', 'justify-center');
+        quickAccess.classList.add('grid', gridClass, 'gap-4', 'justify-items-center');
+        
+        // Update folderBookmarks layout if it exists
+        if (folderBookmarks) {
+            folderBookmarks.classList.remove('flex', 'flex-wrap', 'justify-center');
+            folderBookmarks.classList.add('grid', gridClass, 'gap-6', 'justify-items-center');
+        }
     }
 
     updateToggleVisual(toggle) {
