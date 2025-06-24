@@ -434,6 +434,9 @@
   .flex-wrap {
     flex-wrap: wrap;
   }
+  .place-content-center {
+    place-content: center;
+  }
   .items-center {
     align-items: center;
   }
@@ -445,9 +448,6 @@
   }
   .justify-center {
     justify-content: center;
-  }
-  .justify-items-center {
-    justify-items: center;
   }
   .gap-2 {
     gap: calc(var(--spacing) * 2);
@@ -948,41 +948,16 @@
     }
   }
 }
-.grid-cols-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+:root {
+  --tiles-per-row: 8;
 }
-.grid-cols-4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+#quickAccess .tile, #quickAccess .folder-tile {
+  flex: 0 0 calc(100% / var(--tiles-per-row) - 1rem);
+  max-width: calc(100% / var(--tiles-per-row) - 1rem);
 }
-.grid-cols-5 {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-.grid-cols-7 {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-.grid-cols-8 {
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-}
-.grid-cols-9 {
-  grid-template-columns: repeat(9, minmax(0, 1fr));
-}
-.grid-cols-10 {
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-}
-.grid-cols-11 {
-  grid-template-columns: repeat(11, minmax(0, 1fr));
-}
-.grid-cols-12 {
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-}
-.grid-cols-13 {
-  grid-template-columns: repeat(13, minmax(0, 1fr));
-}
-.grid-cols-14 {
-  grid-template-columns: repeat(14, minmax(0, 1fr));
-}
-.grid-cols-15 {
-  grid-template-columns: repeat(15, minmax(0, 1fr));
+#folderBookmarks .tile {
+  flex: 0 0 calc(100% / var(--tiles-per-row) - 1.5rem);
+  max-width: calc(100% / var(--tiles-per-row) - 1.5rem);
 }
 .plus-icon {
   font-size: 4rem;
