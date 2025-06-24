@@ -1658,13 +1658,13 @@ class BookmarkManager {
         
         // Position modal at bottom right
         modal.classList.remove('hidden');
-        modal.classList.add('right-12', 'bottom-20');
+        modal.classList.add('right-6', 'bottom-20');
     }
 
     hideSettingsModal() {
         const modal = document.getElementById('settingsModal');
         modal.classList.add('hidden');
-        modal.classList.remove('right-12', 'bottom-20');
+        modal.classList.remove('right-6', 'bottom-20');
         // Reset form to current settings
         this.loadCurrentSettingsIntoForm();
     }
