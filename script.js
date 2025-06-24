@@ -9,11 +9,15 @@ class BookmarkManager {
         this.selectedFavicon = null;
         this.faviconDebounceTimer = null;
         this.syncAvailable = false;
+        this.settings = {
+            showTitles: true
+        };
         this.init();
     }
 
     async init() {
         await this.checkSyncAvailability();
+        await this.loadSettings();
         await this.loadBookmarks();
         this.setupEventListeners();
         this.renderQuickAccess();
@@ -47,26 +51,8 @@ class BookmarkManager {
             console.log('   4. For unpacked extensions, sync may not work across different computers');
         }
         
-        this.updateSyncStatusUI();
     }
 
-    updateSyncStatusUI() {
-        const syncStatus = document.getElementById('syncStatus');
-        const syncIcon = document.getElementById('syncIcon');
-        const syncStatusText = document.getElementById('syncStatusText');
-        
-        if (this.syncAvailable) {
-            syncStatus.classList.remove('hidden');
-            syncIcon.setAttribute('class', 'w-4 h-4 text-green-600');
-            syncStatusText.textContent = 'Sync enabled';
-            syncStatusText.className = 'text-green-600';
-        } else {
-            syncStatus.classList.remove('hidden');
-            syncIcon.setAttribute('class', 'w-4 h-4 text-orange-600');
-            syncStatusText.textContent = 'Local only';
-            syncStatusText.className = 'text-orange-600';
-        }
-    }
 
     setupEventListeners() {
         // Add bookmark button
@@ -110,6 +96,7 @@ class BookmarkManager {
                 this.hideAddBookmarkModal();
                 this.cancelEditBookmarkModal();
                 this.hideDeleteConfirmation();
+                this.hideSettingsModal();
             }
         });
 
@@ -152,12 +139,40 @@ class BookmarkManager {
             this.hideDeleteConfirmation();
         });
 
+        // Settings button
+        document.getElementById('settingsBtn').addEventListener('click', () => {
+            this.showSettingsModal();
+        });
+
+        // Settings modal events
+        document.getElementById('cancelSettingsBtn').addEventListener('click', () => {
+            this.hideSettingsModal();
+        });
+
+        document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+            this.saveSettings();
+        });
+
+        // Settings backdrop click
+        document.getElementById('settingsModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                this.hideSettingsModal();
+            }
+        });
+
+
+        // Toggle switch styling
+        document.getElementById('showTitles').addEventListener('change', (e) => {
+            this.updateToggleVisual(e.target);
+        });
+
         // Hide context menu when clicking elsewhere
         document.addEventListener('click', (e) => {
             const isClickInsideModal = e.target.closest('#contextMenu') || 
                                       e.target.closest('#editBookmarkModal') || 
                                       e.target.closest('#deleteConfirmPopup') ||
-                                      e.target.closest('#addBookmarkModal');
+                                      e.target.closest('#addBookmarkModal') ||
+                                      e.target.closest('#settingsModal');
             
             if (!isClickInsideModal) {
                 this.hideContextMenu();
@@ -165,8 +180,9 @@ class BookmarkManager {
                 // Only clear currentBookmarkId if no modals are open
                 const editModalOpen = !document.getElementById('editBookmarkModal').classList.contains('hidden');
                 const addModalOpen = !document.getElementById('addBookmarkModal').classList.contains('hidden');
+                const settingsModalOpen = !document.getElementById('settingsModal').classList.contains('hidden');
                 
-                if (!editModalOpen && !addModalOpen) {
+                if (!editModalOpen && !addModalOpen && !settingsModalOpen) {
                     console.log('Clearing currentBookmarkId due to click outside');
                     this.currentBookmarkId = null;
                 }
@@ -831,23 +847,28 @@ class BookmarkManager {
     renderQuickAccess() {
         const quickAccessContainer = document.getElementById('quickAccess');
         
-        const bookmarkTiles = this.bookmarks.map(bookmark => `
+        const bookmarkTiles = this.bookmarks.map(bookmark => {
+            const paddingClass = this.settings.showTitles ? 'pt-2 px-4 pb-6' : 'p-4';
+            
+            return `
             <div class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer" 
                  data-bookmark-id="${bookmark.id}" 
                  draggable="true"
                  title="${bookmark.title}">
                 <a draggable="false" href="${bookmark.url}" aria-label="${bookmark.title}" class="absolute inset-0"></a>
-                <div class="tile-icon absolute inset-0 flex items-center justify-center pt-2 px-4 pb-6">
+                <div class="tile-icon absolute inset-0 flex items-center justify-center ${paddingClass}">
                     <img draggable="false" alt="" src="${bookmark.favicon}" class="w-full h-full rounded-lg object-cover bookmark-favicon" style="display: ${bookmark.favicon ? 'block' : 'none'};">
                     <div class="w-full h-full bg-blue-500 rounded-lg flex items-center justify-center text-white text-2xl font-bold bookmark-fallback" style="display: ${bookmark.favicon ? 'none' : 'block'};">
                         ${bookmark.title.charAt(0).toUpperCase()}
                     </div>
                 </div>
+                ${this.settings.showTitles ? `
                 <div class="tile-title absolute bottom-1 left-1 right-1">
                     <span class="text-xs text-gray-800 text-center block truncate">${bookmark.title}</span>
-                </div>
+                </div>` : ''}
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         const addButtonTile = `
             <div id="addBookmarkTile" class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 border-dashed rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer" 
@@ -1364,6 +1385,106 @@ class BookmarkManager {
         
         modal.style.left = `${left}px`;
         modal.style.top = `${top}px`;
+    }
+
+    // Settings functionality
+    async loadSettings() {
+        try {
+            const data = await chrome.storage.local.get(['bookmarkSettings']);
+            if (data.bookmarkSettings) {
+                this.settings = { ...this.settings, ...data.bookmarkSettings };
+            }
+        } catch (error) {
+            console.warn('Failed to load settings:', error);
+        }
+    }
+
+    async saveSettingsToStorage() {
+        try {
+            await chrome.storage.local.set({
+                bookmarkSettings: this.settings
+            });
+        } catch (error) {
+            console.warn('Failed to save settings:', error);
+        }
+    }
+
+    showSettingsModal() {
+        const modal = document.getElementById('settingsModal');
+        const showTitlesToggle = document.getElementById('showTitles');
+        
+        // Load current settings into the modal
+        showTitlesToggle.checked = this.settings.showTitles;
+        this.updateToggleVisual(showTitlesToggle);
+        
+        // Update sync status in settings modal
+        this.updateSettingsSyncStatus();
+        
+        modal.classList.remove('hidden');
+    }
+
+    hideSettingsModal() {
+        document.getElementById('settingsModal').classList.add('hidden');
+        // Reset form to current settings
+        this.loadCurrentSettingsIntoForm();
+    }
+
+    loadCurrentSettingsIntoForm() {
+        const showTitlesToggle = document.getElementById('showTitles');
+        
+        showTitlesToggle.checked = this.settings.showTitles;
+        this.updateToggleVisual(showTitlesToggle);
+    }
+
+    async saveSettings() {
+        const showTitlesToggle = document.getElementById('showTitles');
+        
+        // Update settings object
+        this.settings.showTitles = showTitlesToggle.checked;
+        
+        // Save to storage
+        await this.saveSettingsToStorage();
+        
+        // Re-render bookmarks to apply title visibility changes
+        this.renderQuickAccess();
+        
+        // Hide modal
+        this.hideSettingsModal();
+    }
+
+    updateToggleVisual(toggle) {
+        const toggleBg = toggle.parentElement.querySelector('.toggle-bg');
+        const toggleDot = toggle.parentElement.querySelector('.toggle-dot');
+        
+        if (toggle.checked) {
+            toggleBg.classList.remove('bg-gray-200');
+            toggleBg.classList.add('bg-blue-500');
+            toggleDot.style.transform = 'translateX(22px)';
+        } else {
+            toggleBg.classList.remove('bg-blue-500');
+            toggleBg.classList.add('bg-gray-200');
+            toggleDot.style.transform = 'translateX(0)';
+        }
+    }
+
+
+
+    updateSettingsSyncStatus() {
+        const statusContainer = document.getElementById('settingsSyncStatus');
+        const statusIcon = document.getElementById('settingsSyncIcon');
+        const statusText = document.getElementById('settingsSyncText');
+        
+        if (this.syncAvailable) {
+            statusIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>';
+            statusIcon.setAttribute('class', 'w-4 h-4 text-green-500');
+            statusText.textContent = 'Sync enabled and working';
+            statusContainer.className = 'flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg';
+        } else {
+            statusIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>';
+            statusIcon.setAttribute('class', 'w-4 h-4 text-yellow-500');
+            statusText.textContent = 'Sync not available';
+            statusContainer.className = 'flex items-center space-x-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg';
+        }
     }
 
     // Removed unused bookmark card and list rendering methods

@@ -20,12 +20,6 @@
                 <h1 class="text-2xl font-bold text-custom-text">QuiClick</h1>
             </div>
             <div class="flex items-center space-x-4">
-                <div id="syncStatus" class="hidden flex items-center space-x-1 text-sm text-gray-600">
-                    <svg id="syncIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
-                    <span id="syncStatusText">Sync enabled</span>
-                </div>
                 <button id="addBookmarkBtn" class="bg-custom-accent text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2 cursor-pointer font-bold text-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
@@ -125,6 +119,50 @@
         <div class="flex space-x-2">
             <button id="cancelDeleteBtn" class="flex-1 px-2 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer font-bold">Cancel</button>
             <button id="confirmDeleteBtn" class="flex-1 px-2 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition-colors cursor-pointer font-bold">Delete</button>
+        </div>
+    </div>
+
+    <!-- Settings Button -->
+    <button id="settingsBtn" class="fixed right-6 bottom-6 bg-white border border-custom-border rounded-full p-3 shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer z-40">
+        <svg class="w-6 h-6 text-gray-600 hover:text-custom-accent transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+    </button>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal-backdrop fixed inset-0 hidden flex items-center justify-center z-50">
+        <div class="modal-content rounded-xl p-6 w-96 mx-4 max-h-[80vh] overflow-y-auto">
+            <h3 class="text-lg font-semibold text-custom-text mb-4">Settings</h3>
+            
+            <!-- Show/Hide Bookmark Titles -->
+            <div class="mb-6">
+                <label class="flex items-center justify-between cursor-pointer">
+                    <span class="text-sm font-medium text-custom-text">Show bookmark titles</span>
+                    <div class="relative flex items-center">
+                        <input type="checkbox" id="showTitles" class="sr-only">
+                        <div class="toggle-bg w-10 h-6 bg-gray-200 rounded-full shadow-inner"></div>
+                        <div class="toggle-dot absolute w-4 h-4 bg-white rounded-full shadow left-0.5 transition"></div>
+                    </div>
+                </label>
+            </div>
+
+
+            <!-- Sync Status -->
+            <div class="mb-6">
+                <div id="settingsSyncStatus" class="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
+                    <svg id="settingsSyncIcon" class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span id="settingsSyncText" class="text-sm text-gray-700">Sync enabled and working</span>
+                </div>
+            </div>
+
+            <!-- Modal Actions -->
+            <div class="flex space-x-3">
+                <button type="button" id="cancelSettingsBtn" class="flex-1 px-3 py-2 border border-custom-border rounded-lg text-custom-text hover:bg-gray-50 transition-colors cursor-pointer font-bold text-sm">Cancel</button>
+                <button type="button" id="saveSettingsBtn" class="flex-1 px-3 py-2 bg-custom-accent text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer font-bold text-sm">Save</button>
+            </div>
         </div>
     </div>
 
