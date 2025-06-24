@@ -1,9 +1,13 @@
 class BookmarkManager {
     constructor() {
         this.bookmarks = [];
+        this.folders = [];
         this.currentBookmarkId = null;
+        this.currentFolderId = null;
+        this.openFolderId = null;
         this.isDragging = false;
         this.draggedBookmarkId = null;
+        this.draggedFolderId = null;
         this.isDuplicateMode = false;
         this.duplicatedBookmarkId = null;
         this.selectedFavicon = null;
@@ -19,6 +23,7 @@ class BookmarkManager {
         await this.checkSyncAvailability();
         await this.loadSettings();
         await this.loadBookmarks();
+        await this.loadFolders();
         this.setupEventListeners();
         this.renderQuickAccess();
     }
@@ -60,6 +65,11 @@ class BookmarkManager {
             this.showAddBookmarkModal();
         });
 
+        // Create folder button
+        document.getElementById('createFolderBtn').addEventListener('click', () => {
+            this.showCreateFolderModal();
+        });
+
         // Cancel add bookmark
         document.getElementById('cancelAddBtn').addEventListener('click', () => {
             this.hideAddBookmarkModal();
@@ -97,6 +107,8 @@ class BookmarkManager {
                 this.cancelEditBookmarkModal();
                 this.hideDeleteConfirmation();
                 this.hideSettingsModal();
+                this.closeFolderModal();
+                this.hideCreateFolderModal();
             }
         });
 
@@ -160,6 +172,33 @@ class BookmarkManager {
             }
         });
 
+        // Folder modal events
+        document.getElementById('closeFolderBtn').addEventListener('click', () => {
+            this.closeFolderModal();
+        });
+
+        document.getElementById('folderModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                this.closeFolderModal();
+            }
+        });
+
+        // Create folder modal events
+        document.getElementById('cancelCreateFolderBtn').addEventListener('click', () => {
+            this.hideCreateFolderModal();
+        });
+
+        document.getElementById('createFolderForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.createFolderFromModal();
+        });
+
+        document.getElementById('createFolderModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                this.hideCreateFolderModal();
+            }
+        });
+
 
         // Toggle switch styling
         document.getElementById('showTitles').addEventListener('change', (e) => {
@@ -172,7 +211,9 @@ class BookmarkManager {
                                       e.target.closest('#editBookmarkModal') || 
                                       e.target.closest('#deleteConfirmPopup') ||
                                       e.target.closest('#addBookmarkModal') ||
-                                      e.target.closest('#settingsModal');
+                                      e.target.closest('#settingsModal') ||
+                                      e.target.closest('#folderModal') ||
+                                      e.target.closest('#createFolderModal');
             
             if (!isClickInsideModal) {
                 this.hideContextMenu();
@@ -181,8 +222,10 @@ class BookmarkManager {
                 const editModalOpen = !document.getElementById('editBookmarkModal').classList.contains('hidden');
                 const addModalOpen = !document.getElementById('addBookmarkModal').classList.contains('hidden');
                 const settingsModalOpen = !document.getElementById('settingsModal').classList.contains('hidden');
+                const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
+                const createFolderModalOpen = !document.getElementById('createFolderModal').classList.contains('hidden');
                 
-                if (!editModalOpen && !addModalOpen && !settingsModalOpen) {
+                if (!editModalOpen && !addModalOpen && !settingsModalOpen && !folderModalOpen && !createFolderModalOpen) {
                     console.log('Clearing currentBookmarkId due to click outside');
                     this.currentBookmarkId = null;
                 }
@@ -570,6 +613,50 @@ class BookmarkManager {
         }
     }
 
+    async loadFolders() {
+        try {
+            let result;
+            let loadedFromSync = false;
+            
+            // Try to load from sync storage first (only if sync is available)
+            if (this.syncAvailable) {
+                try {
+                    result = await chrome.storage.sync.get(['folders']);
+                    if (result.folders && result.folders.length > 0) {
+                        console.log('Loaded folders from sync storage');
+                        loadedFromSync = true;
+                    } else {
+                        throw new Error('No folders in sync storage');
+                    }
+                } catch (syncError) {
+                    console.log('Sync storage error for folders, falling back to local:', syncError.message);
+                }
+            }
+            
+            if (!loadedFromSync) {
+                // Fallback to local storage
+                console.log('Loading folders from local storage');
+                result = await chrome.storage.local.get(['folders']);
+                
+                // If we have folders in local but not sync, try to migrate them (only if sync is available)
+                if (this.syncAvailable && result.folders && result.folders.length > 0) {
+                    console.log('Found folders in local storage, attempting to migrate to sync');
+                    try {
+                        await chrome.storage.sync.set({ folders: result.folders });
+                        console.log('Successfully migrated folders to sync storage');
+                    } catch (migrationError) {
+                        console.log('Migration of folders to sync failed, keeping in local storage');
+                    }
+                }
+            }
+            
+            this.folders = result.folders || [];
+        } catch (error) {
+            console.log('Error loading folders, using empty array');
+            this.folders = [];
+        }
+    }
+
     async getDefaultBookmarks() {
         const defaultUrls = [
             { title: 'Google', url: 'https://www.google.com' },
@@ -587,7 +674,8 @@ class BookmarkManager {
                 title,
                 url,
                 favicon,
-                dateAdded: new Date().toISOString()
+                dateAdded: new Date().toISOString(),
+                folderId: null
             });
         }
         
@@ -600,24 +688,25 @@ class BookmarkManager {
             if (this.syncAvailable) {
                 try {
                     // Check if bookmarks data is too large for sync storage
-                    const bookmarksData = JSON.stringify(this.bookmarks);
-                    const sizeInBytes = new TextEncoder().encode(bookmarksData).length;
+                    const data = { bookmarks: this.bookmarks, folders: this.folders };
+                    const dataString = JSON.stringify(data);
+                    const sizeInBytes = new TextEncoder().encode(dataString).length;
                     
                     // Chrome sync storage limits: 8KB per item, 100KB total
                     if (sizeInBytes > 8000) { // 8KB limit with some buffer
-                        console.log('Bookmarks data too large for sync storage, using local storage');
-                        await chrome.storage.local.set({ bookmarks: this.bookmarks });
+                        console.log('Data too large for sync storage, using local storage');
+                        await chrome.storage.local.set(data);
                     } else {
-                        await chrome.storage.sync.set({ bookmarks: this.bookmarks });
-                        console.log('Saved bookmarks to sync storage');
+                        await chrome.storage.sync.set(data);
+                        console.log('Saved bookmarks and folders to sync storage');
                     }
                 } catch (syncError) {
                     console.log('Sync storage failed, saving to local storage:', syncError.message);
-                    await chrome.storage.local.set({ bookmarks: this.bookmarks });
+                    await chrome.storage.local.set({ bookmarks: this.bookmarks, folders: this.folders });
                 }
             } else {
                 console.log('Sync not available, saving to local storage');
-                await chrome.storage.local.set({ bookmarks: this.bookmarks });
+                await chrome.storage.local.set({ bookmarks: this.bookmarks, folders: this.folders });
             }
         } catch (error) {
             console.error('Error saving bookmarks:', error);
@@ -823,7 +912,8 @@ class BookmarkManager {
             title,
             url,
             favicon: this.selectedFavicon || '',
-            dateAdded: new Date().toISOString()
+            dateAdded: new Date().toISOString(),
+            folderId: null // null means it's not in a folder
         };
 
         // Check if a favicon was selected before hiding modal (which resets selectedFavicon)
@@ -847,7 +937,36 @@ class BookmarkManager {
     renderQuickAccess() {
         const quickAccessContainer = document.getElementById('quickAccess');
         
-        const bookmarkTiles = this.bookmarks.map(bookmark => {
+        // Filter bookmarks that are not in folders (or are in the current open folder)
+        const visibleBookmarks = this.openFolderId 
+            ? this.bookmarks.filter(b => b.folderId === this.openFolderId)
+            : this.bookmarks.filter(b => !b.folderId);
+        
+        // Render folder tiles (only if not inside a folder)
+        const folderTiles = this.openFolderId ? '' : this.folders.map(folder => {
+            const paddingClass = this.settings.showTitles ? 'pt-2 px-4 pb-6' : 'p-4';
+            
+            return `
+            <div class="tile w-24 h-24 relative bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 hover:shadow-md transition-all duration-200 cursor-pointer" 
+                 data-folder-id="${folder.id}" 
+                 draggable="false"
+                 title="${folder.name}">
+                <div class="tile-icon absolute inset-0 flex items-center justify-center ${paddingClass}">
+                    <div class="w-full h-full bg-amber-500 rounded-lg flex items-center justify-center text-white">
+                        <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                        </svg>
+                    </div>
+                </div>
+                ${this.settings.showTitles ? `
+                <div class="tile-title absolute bottom-1 left-1 right-1">
+                    <span class="text-xs text-gray-800 text-center block truncate">${folder.name}</span>
+                </div>` : ''}
+            </div>
+        `;
+        }).join('');
+        
+        const bookmarkTiles = visibleBookmarks.map(bookmark => {
             const paddingClass = this.settings.showTitles ? 'pt-2 px-4 pb-6' : 'p-4';
             
             return `
@@ -879,7 +998,7 @@ class BookmarkManager {
             </div>
         `;
 
-        quickAccessContainer.innerHTML = bookmarkTiles + addButtonTile;
+        quickAccessContainer.innerHTML = folderTiles + bookmarkTiles + addButtonTile;
         
         // Add event listeners for bookmark clicks and right-clicks
         this.bookmarks.forEach(bookmark => {
@@ -949,6 +1068,47 @@ class BookmarkManager {
                 faviconImg.style.display = 'none';
                 fallbackDiv.style.display = 'block';
             });
+        });
+
+        // Add event listeners for folder tiles
+        this.folders.forEach(folder => {
+            const folderElement = quickAccessContainer.querySelector(`[data-folder-id="${folder.id}"]`);
+            if (folderElement) {
+                // Left click - open folder
+                folderElement.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.openFolder(folder.id);
+                });
+                
+                // Right click - show folder context menu (for future implementation)
+                folderElement.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    // TODO: Add folder context menu
+                });
+
+                // Drag over - accept bookmarks
+                folderElement.addEventListener('dragover', (e) => {
+                    if (this.draggedBookmarkId && !this.openFolderId) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        folderElement.classList.add('bg-amber-200', 'border-amber-400');
+                    }
+                });
+
+                // Drag leave - remove drop indicator
+                folderElement.addEventListener('dragleave', (e) => {
+                    folderElement.classList.remove('bg-amber-200', 'border-amber-400');
+                });
+
+                // Drop - move bookmark to folder
+                folderElement.addEventListener('drop', (e) => {
+                    if (this.draggedBookmarkId && !this.openFolderId) {
+                        e.preventDefault();
+                        this.moveBookmarkToFolder(this.draggedBookmarkId, folder.id);
+                        folderElement.classList.remove('bg-amber-200', 'border-amber-400');
+                    }
+                });
+            }
         });
 
         // Add event listener for the add bookmark tile
@@ -1485,6 +1645,143 @@ class BookmarkManager {
             statusText.textContent = 'Sync not available';
             statusContainer.className = 'flex items-center space-x-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg';
         }
+    }
+
+    // Folder management methods
+    openFolder(folderId) {
+        const folder = this.folders.find(f => f.id === folderId);
+        if (!folder) return;
+        
+        document.getElementById('folderModalTitle').textContent = folder.name;
+        document.getElementById('folderModal').classList.remove('hidden');
+        
+        // Render bookmarks in this folder
+        this.renderFolderBookmarks(folderId);
+    }
+
+    closeFolderModal() {
+        document.getElementById('folderModal').classList.add('hidden');
+        this.openFolderId = null;
+    }
+
+    renderFolderBookmarks(folderId) {
+        const folderBookmarksContainer = document.getElementById('folderBookmarks');
+        const folderBookmarks = this.bookmarks.filter(b => b.folderId === folderId);
+        
+        if (folderBookmarks.length === 0) {
+            folderBookmarksContainer.innerHTML = `
+                <div class="text-center text-gray-500 w-full py-8">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                    </svg>
+                    <p class="text-lg font-medium">This folder is empty</p>
+                    <p class="text-sm">Drag bookmarks here to organize them</p>
+                </div>
+            `;
+            return;
+        }
+
+        const bookmarkTiles = folderBookmarks.map(bookmark => {
+            const paddingClass = this.settings.showTitles ? 'pt-2 px-4 pb-6' : 'p-4';
+            
+            return `
+            <div class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 rounded-lg hover:bg-white hover:shadow-md transition-all duration-200 cursor-pointer" 
+                 data-bookmark-id="${bookmark.id}" 
+                 draggable="true"
+                 title="${bookmark.title}">
+                <a draggable="false" href="${bookmark.url}" aria-label="${bookmark.title}" class="absolute inset-0"></a>
+                <div class="tile-icon absolute inset-0 flex items-center justify-center ${paddingClass}">
+                    <img draggable="false" alt="" src="${bookmark.favicon}" class="w-full h-full rounded-lg object-cover bookmark-favicon" style="display: ${bookmark.favicon ? 'block' : 'none'};">
+                    <div class="w-full h-full bg-blue-500 rounded-lg flex items-center justify-center text-white text-2xl font-bold bookmark-fallback" style="display: ${bookmark.favicon ? 'none' : 'block'};">
+                        ${bookmark.title.charAt(0).toUpperCase()}
+                    </div>
+                </div>
+                ${this.settings.showTitles ? `
+                <div class="tile-title absolute bottom-1 left-1 right-1">
+                    <span class="text-xs text-gray-800 text-center block truncate">${bookmark.title}</span>
+                </div>` : ''}
+            </div>
+        `;
+        }).join('');
+
+        folderBookmarksContainer.innerHTML = bookmarkTiles;
+        
+        // Add event listeners for bookmarks in folder
+        folderBookmarks.forEach(bookmark => {
+            const bookmarkElement = folderBookmarksContainer.querySelector(`[data-bookmark-id="${bookmark.id}"]`);
+            
+            // Left click - navigate to URL
+            bookmarkElement.addEventListener('click', (e) => {
+                if (e.button === 0 && !this.isDragging) {
+                    window.location.href = bookmark.url;
+                }
+            });
+            
+            // Middle click - open in new background tab
+            bookmarkElement.addEventListener('mousedown', (e) => {
+                if (e.button === 1 && !this.isDragging) {
+                    e.preventDefault();
+                    chrome.tabs.create({ url: bookmark.url, active: false });
+                }
+            });
+            
+            // Right click - show context menu
+            bookmarkElement.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.showContextMenu(e, bookmark.id);
+            });
+
+            // Handle favicon error
+            const faviconImg = bookmarkElement.querySelector('.bookmark-favicon');
+            const fallbackDiv = bookmarkElement.querySelector('.bookmark-fallback');
+            
+            faviconImg.addEventListener('error', () => {
+                faviconImg.style.display = 'none';
+                fallbackDiv.style.display = 'block';
+            });
+        });
+    }
+
+    async moveBookmarkToFolder(bookmarkId, folderId) {
+        const bookmark = this.bookmarks.find(b => b.id === bookmarkId);
+        if (!bookmark) return;
+        
+        bookmark.folderId = folderId;
+        await this.saveBookmarks();
+        this.renderQuickAccess();
+    }
+
+    async createFolder(name) {
+        const folder = {
+            id: Date.now(),
+            name: name,
+            dateCreated: new Date().toISOString()
+        };
+        
+        this.folders.push(folder);
+        await this.saveBookmarks();
+        this.renderQuickAccess();
+        
+        return folder;
+    }
+
+    showCreateFolderModal() {
+        document.getElementById('createFolderModal').classList.remove('hidden');
+        document.getElementById('folderName').focus();
+    }
+
+    hideCreateFolderModal() {
+        document.getElementById('createFolderModal').classList.add('hidden');
+        document.getElementById('createFolderForm').reset();
+    }
+
+    async createFolderFromModal() {
+        const folderName = document.getElementById('folderName').value.trim();
+        
+        if (!folderName) return;
+        
+        await this.createFolder(folderName);
+        this.hideCreateFolderModal();
     }
 
     // Removed unused bookmark card and list rendering methods
