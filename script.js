@@ -1769,7 +1769,17 @@ class BookmarkManager {
             14: 'gap-14',
             16: 'gap-16',
             18: 'gap-18',
-            20: 'gap-20'
+            20: 'gap-20',
+            22: 'gap-22',
+            24: 'gap-24',
+            26: 'gap-26',
+            28: 'gap-28',
+            30: 'gap-30',
+            32: 'gap-32',
+            34: 'gap-34',
+            36: 'gap-36',
+            38: 'gap-38',
+            40: 'gap-40'
         };
         const gapClass = gapClasses[this.settings.tileGap] || 'gap-2';
         
