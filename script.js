@@ -260,6 +260,7 @@ class BookmarkManager {
             if (!isClickInsideModal) {
                 this.hideContextMenu();
                 this.hideDeleteConfirmation();
+                this.hideSettingsModal();
                 // Only clear currentBookmarkId if no modals are open
                 const editModalOpen = !document.getElementById('editBookmarkModal').classList.contains('hidden');
                 const addModalOpen = !document.getElementById('addBookmarkModal').classList.contains('hidden');
