@@ -16,7 +16,7 @@ class BookmarkManager {
         this.settings = {
             showTitles: true,
             tilesPerRow: 8,
-            tileGap: 4,
+            tileGap: 1,
             showAddButton: true
         };
         this.init();
@@ -1757,19 +1757,19 @@ class BookmarkManager {
         const gridClass = gridClasses[tilesPerRow] || 'grid-cols-8';
         const maxWidthClass = maxWidthClasses[tilesPerRow];
         
-        // Get gap class based on setting - explicit mapping for Tailwind compilation
+        // Get gap class based on setting - maps user-friendly 0-10 values to actual gap classes
         const gapClasses = {
-            0: 'gap-0',
-            4: 'gap-4',
-            8: 'gap-8',
-            12: 'gap-12',
-            16: 'gap-16',
-            20: 'gap-20',
-            24: 'gap-24',
-            28: 'gap-28',
-            32: 'gap-32',
-            36: 'gap-36',
-            40: 'gap-40'
+            0: 'gap-0',     // 0 → gap-0 (0px)
+            1: 'gap-4',     // 1 → gap-4 (16px)
+            2: 'gap-8',     // 2 → gap-8 (32px)
+            3: 'gap-12',    // 3 → gap-12 (48px)
+            4: 'gap-16',    // 4 → gap-16 (64px)
+            5: 'gap-20',    // 5 → gap-20 (80px)
+            6: 'gap-24',    // 6 → gap-24 (96px)
+            7: 'gap-28',    // 7 → gap-28 (112px)
+            8: 'gap-32',    // 8 → gap-32 (128px)
+            9: 'gap-36',    // 9 → gap-36 (144px)
+            10: 'gap-40'    // 10 → gap-40 (160px)
         };
         const gapClass = gapClasses[this.settings.tileGap] || 'gap-4';
         
