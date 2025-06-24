@@ -162,12 +162,7 @@ class BookmarkManager {
 
         // Settings modal events - removed Save/Cancel buttons, settings apply immediately
 
-        // Settings backdrop click
-        document.getElementById('settingsModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                this.hideSettingsModal();
-            }
-        });
+        // Settings modal - no backdrop click handler needed since no backdrop
 
         // Folder modal events
         document.getElementById('closeFolderBtn').addEventListener('click', () => {
@@ -1661,11 +1656,15 @@ class BookmarkManager {
         // Update sync status in settings modal
         this.updateSettingsSyncStatus();
         
+        // Position modal at bottom right
         modal.classList.remove('hidden');
+        modal.classList.add('right-6', 'bottom-20');
     }
 
     hideSettingsModal() {
-        document.getElementById('settingsModal').classList.add('hidden');
+        const modal = document.getElementById('settingsModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('right-6', 'bottom-20');
         // Reset form to current settings
         this.loadCurrentSettingsIntoForm();
     }
