@@ -260,8 +260,8 @@ class BookmarkManager {
             if (!isClickInsideModal) {
                 this.hideContextMenu();
                 this.hideDeleteConfirmation();
-                this.hideSettingsModal();
-                // Only clear currentBookmarkId if no modals are open
+                
+                // Check modal states
                 const editModalOpen = !document.getElementById('editBookmarkModal').classList.contains('hidden');
                 const addModalOpen = !document.getElementById('addBookmarkModal').classList.contains('hidden');
                 const settingsModalOpen = !document.getElementById('settingsModal').classList.contains('hidden');
@@ -269,6 +269,12 @@ class BookmarkManager {
                 const createFolderModalOpen = !document.getElementById('createFolderModal').classList.contains('hidden');
                 const renameFolderModalOpen = !document.getElementById('renameFolderModal').classList.contains('hidden');
                 
+                // Close settings modal if it's open
+                if (settingsModalOpen) {
+                    this.hideSettingsModal();
+                }
+                
+                // Only clear currentBookmarkId if no modals are open
                 if (!editModalOpen && !addModalOpen && !settingsModalOpen && !folderModalOpen && !createFolderModalOpen && !renameFolderModalOpen) {
                     console.log('Clearing currentBookmarkId and currentFolderId due to click outside');
                     this.currentBookmarkId = null;
