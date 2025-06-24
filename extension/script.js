@@ -1241,9 +1241,12 @@ class BookmarkManager {
         this.renderQuickAccess();
     }
 
-    // Helper function to get the appropriate z-index for context menu based on open modals
-    getContextMenuZIndex() {
-        // Check all possible modals and return appropriate z-index
+    // Helper function to set appropriate z-index class based on open modals
+    setElementZIndex(element) {
+        // Remove all possible z-index classes first
+        element.classList.remove('z-50', 'z-60', 'z-70', 'z-80', 'z-90');
+        
+        // Check which modals are open to determine appropriate z-index
         const modals = [
             { id: 'addBookmarkModal', zIndex: 50 },
             { id: 'editBookmarkModal', zIndex: 60 },
@@ -1257,14 +1260,20 @@ class BookmarkManager {
         let highestModalZIndex = 0;
         
         for (const modal of modals) {
-            const element = document.getElementById(modal.id);
-            if (element && !element.classList.contains('hidden')) {
+            const modalElement = document.getElementById(modal.id);
+            if (modalElement && !modalElement.classList.contains('hidden')) {
                 highestModalZIndex = Math.max(highestModalZIndex, modal.zIndex);
             }
         }
         
-        // Return z-index that's 10 higher than the highest open modal, minimum 60
-        return Math.max(60, highestModalZIndex + 10);
+        // Set appropriate z-index class based on highest modal
+        if (highestModalZIndex >= 60) {
+            element.classList.add('z-80'); // Above edit modals
+        } else if (highestModalZIndex >= 50) {
+            element.classList.add('z-70'); // Above regular modals  
+        } else {
+            element.classList.add('z-60'); // Default high level
+        }
     }
 
     showContextMenu(event, bookmarkId) {
@@ -1280,8 +1289,9 @@ class BookmarkManager {
         document.getElementById('deleteFolder').classList.add('hidden');
         
         // Set z-index based on open modals
-        contextMenu.style.zIndex = this.getContextMenuZIndex().toString();
+        this.setElementZIndex(contextMenu);
         
+        // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning
         contextMenu.style.left = `${event.pageX}px`;
         contextMenu.style.top = `${event.pageY}px`;
         contextMenu.classList.remove('hidden');
@@ -1303,7 +1313,8 @@ class BookmarkManager {
         const contextMenu = document.getElementById('contextMenu');
         contextMenu.classList.add('hidden');
         // Reset z-index to default
-        contextMenu.style.zIndex = '60';
+        contextMenu.classList.remove('z-70', 'z-80', 'z-90');
+        contextMenu.classList.add('z-60');
         // Don't clear currentBookmarkId or currentFolderId here as they're needed for edit/delete operations
     }
 
@@ -1327,7 +1338,7 @@ class BookmarkManager {
         document.getElementById('editBookmarkUrl').value = bookmark.url;
         
         // Set z-index based on open modals
-        modal.style.zIndex = this.getContextMenuZIndex().toString();
+        this.setElementZIndex(modal);
         
         // Position the modal near the bookmark being edited
         this.positionEditModal(modal);
@@ -1356,7 +1367,7 @@ class BookmarkManager {
         document.getElementById('editBookmarkUrl').value = bookmark.url;
         
         // Set z-index based on open modals
-        modal.style.zIndex = this.getContextMenuZIndex().toString();
+        this.setElementZIndex(modal);
         
         // Position the modal near the bookmark being duplicated
         this.positionEditModal(modal);
@@ -1372,7 +1383,8 @@ class BookmarkManager {
         const modal = document.getElementById('editBookmarkModal');
         modal.classList.add('hidden');
         // Reset z-index to default
-        modal.style.zIndex = '60';
+        modal.classList.remove('z-70', 'z-80', 'z-90');
+        modal.classList.add('z-60');
         document.getElementById('editBookmarkForm').reset();
         this.currentBookmarkId = null;
         this.isDuplicateMode = false;
@@ -1543,9 +1555,13 @@ class BookmarkManager {
                 top = 10;
             }
             
+            // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning  
             popup.style.left = `${left}px`;
             popup.style.top = `${top}px`;
         }
+        
+        // Set z-index based on open modals
+        this.setElementZIndex(popup);
         
         popup.classList.remove('hidden');
     }
@@ -1554,7 +1570,11 @@ class BookmarkManager {
         // Remove delete highlighting for both bookmarks and folders
         this.removeDeleteHighlight();
         this.removeFolderDeleteHighlight();
-        document.getElementById('deleteConfirmPopup').classList.add('hidden');
+        const popup = document.getElementById('deleteConfirmPopup');
+        popup.classList.add('hidden');
+        // Reset z-index to default
+        popup.classList.remove('z-60', 'z-70', 'z-80', 'z-90');
+        popup.classList.add('z-50');
     }
     
     async confirmDeleteBookmark() {
@@ -1681,6 +1701,7 @@ class BookmarkManager {
             left = 10;
         }
         
+        // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning
         modal.style.left = `${left}px`;
         modal.style.top = `${top}px`;
     }
@@ -2027,8 +2048,9 @@ class BookmarkManager {
         document.getElementById('deleteFolder').classList.remove('hidden');
         
         // Set z-index based on open modals
-        contextMenu.style.zIndex = this.getContextMenuZIndex().toString();
+        this.setElementZIndex(contextMenu);
         
+        // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning
         contextMenu.style.left = `${event.pageX}px`;
         contextMenu.style.top = `${event.pageY}px`;
         contextMenu.classList.remove('hidden');
@@ -2151,9 +2173,13 @@ class BookmarkManager {
                 top = 10;
             }
             
+            // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning  
             popup.style.left = `${left}px`;
             popup.style.top = `${top}px`;
         }
+        
+        // Set z-index based on open modals
+        this.setElementZIndex(popup);
         
         popup.classList.remove('hidden');
     }
