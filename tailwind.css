@@ -526,9 +526,6 @@
   .justify-center {
     justify-content: center;
   }
-  .gap-0 {
-    gap: calc(var(--spacing) * 0);
-  }
   .gap-2 {
     gap: calc(var(--spacing) * 2);
   }
@@ -538,32 +535,38 @@
   .gap-6 {
     gap: calc(var(--spacing) * 6);
   }
-  .gap-8 {
-    gap: calc(var(--spacing) * 8);
+  .gap-x-0 {
+    column-gap: calc(var(--spacing) * 0);
   }
-  .gap-12 {
-    gap: calc(var(--spacing) * 12);
+  .gap-x-4 {
+    column-gap: calc(var(--spacing) * 4);
   }
-  .gap-16 {
-    gap: calc(var(--spacing) * 16);
+  .gap-x-8 {
+    column-gap: calc(var(--spacing) * 8);
   }
-  .gap-20 {
-    gap: calc(var(--spacing) * 20);
+  .gap-x-12 {
+    column-gap: calc(var(--spacing) * 12);
   }
-  .gap-24 {
-    gap: calc(var(--spacing) * 24);
+  .gap-x-16 {
+    column-gap: calc(var(--spacing) * 16);
   }
-  .gap-28 {
-    gap: calc(var(--spacing) * 28);
+  .gap-x-20 {
+    column-gap: calc(var(--spacing) * 20);
   }
-  .gap-32 {
-    gap: calc(var(--spacing) * 32);
+  .gap-x-24 {
+    column-gap: calc(var(--spacing) * 24);
   }
-  .gap-36 {
-    gap: calc(var(--spacing) * 36);
+  .gap-x-28 {
+    column-gap: calc(var(--spacing) * 28);
   }
-  .gap-40 {
-    gap: calc(var(--spacing) * 40);
+  .gap-x-32 {
+    column-gap: calc(var(--spacing) * 32);
+  }
+  .gap-x-36 {
+    column-gap: calc(var(--spacing) * 36);
+  }
+  .gap-x-40 {
+    column-gap: calc(var(--spacing) * 40);
   }
   .space-x-1 {
     :where(& > :not(:last-child)) {
@@ -592,6 +595,39 @@
       margin-inline-start: calc(calc(var(--spacing) * 4) * var(--tw-space-x-reverse));
       margin-inline-end: calc(calc(var(--spacing) * 4) * calc(1 - var(--tw-space-x-reverse)));
     }
+  }
+  .gap-y-0 {
+    row-gap: calc(var(--spacing) * 0);
+  }
+  .gap-y-2 {
+    row-gap: calc(var(--spacing) * 2);
+  }
+  .gap-y-4 {
+    row-gap: calc(var(--spacing) * 4);
+  }
+  .gap-y-6 {
+    row-gap: calc(var(--spacing) * 6);
+  }
+  .gap-y-8 {
+    row-gap: calc(var(--spacing) * 8);
+  }
+  .gap-y-10 {
+    row-gap: calc(var(--spacing) * 10);
+  }
+  .gap-y-12 {
+    row-gap: calc(var(--spacing) * 12);
+  }
+  .gap-y-14 {
+    row-gap: calc(var(--spacing) * 14);
+  }
+  .gap-y-16 {
+    row-gap: calc(var(--spacing) * 16);
+  }
+  .gap-y-18 {
+    row-gap: calc(var(--spacing) * 18);
+  }
+  .gap-y-20 {
+    row-gap: calc(var(--spacing) * 20);
   }
   .truncate {
     overflow: hidden;
