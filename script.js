@@ -1797,18 +1797,19 @@ class BookmarkManager {
         const quickAccess = document.getElementById('quickAccess');
         const folderBookmarks = document.getElementById('folderBookmarks');
         
-        // Map tiles per row to appropriate existing TailwindCSS max-width classes
+        // Map tiles per row to appropriate max-width classes - updated for proper gap spacing
+        // Each tile is 96px (w-24), gaps are 16px default, so: tiles*96 + (tiles-1)*16
         const maxWidthClasses = {
-            3: 'max-w-sm',    // ~24rem
-            4: 'max-w-md',    // ~28rem  
-            5: 'max-w-lg',    // ~32rem
-            6: 'max-w-xl',    // ~36rem
-            7: 'max-w-2xl',   // ~42rem
-            8: 'max-w-3xl',   // ~48rem
-            9: 'max-w-4xl',   // ~56rem
-            10: 'max-w-5xl',  // ~64rem
-            11: 'max-w-6xl',  // ~72rem
-            12: 'max-w-7xl'   // ~80rem
+            3: 'max-w-sm',    // 3*96 + 2*16 = 320px (~20rem)
+            4: 'max-w-md',    // 4*96 + 3*16 = 432px (~27rem)  
+            5: 'max-w-xl',    // 5*96 + 4*16 = 544px (~34rem)
+            6: 'max-w-2xl',   // 6*96 + 5*16 = 656px (~41rem)
+            7: 'max-w-3xl',   // 7*96 + 6*16 = 768px (~48rem)
+            8: 'max-w-4xl',   // 8*96 + 7*16 = 880px (~55rem)
+            9: 'max-w-5xl',   // 9*96 + 8*16 = 992px (~62rem)
+            10: 'max-w-6xl',  // 10*96 + 9*16 = 1104px (~69rem)
+            11: 'max-w-7xl',  // 11*96 + 10*16 = 1216px (~76rem)
+            12: 'max-w-7xl'   // 12*96 + 11*16 = 1328px (~83rem) - use max available
         };
         
         // Clear all classes and rebuild with only what we need
