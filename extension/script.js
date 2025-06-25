@@ -1830,29 +1830,29 @@ class BookmarkManager {
         const gridClass = gridClasses[tilesPerRow] || 'grid-cols-8';
         const maxWidthClass = maxWidthClasses[tilesPerRow];
         
-        // Get gap class based on setting - maps user-friendly 0-10 values to actual gap classes
-        const gapClasses = {
-            0: 'gap-0',     // 0 → gap-0 (0px)
-            1: 'gap-4',     // 1 → gap-4 (16px)
-            2: 'gap-8',     // 2 → gap-8 (32px)
-            3: 'gap-12',    // 3 → gap-12 (48px)
-            4: 'gap-16',    // 4 → gap-16 (64px)
-            5: 'gap-20',    // 5 → gap-20 (80px)
-            6: 'gap-24',    // 6 → gap-24 (96px)
-            7: 'gap-28',    // 7 → gap-28 (112px)
-            8: 'gap-32',    // 8 → gap-32 (128px)
-            9: 'gap-36',    // 9 → gap-36 (144px)
-            10: 'gap-40'    // 10 → gap-40 (160px)
+        // Get gap classes based on setting - separate column and row gaps for better spacing
+        const gapMapping = {
+            0: { x: 'gap-x-0', y: 'gap-y-0' },     // 0 → no gaps
+            1: { x: 'gap-x-4', y: 'gap-y-2' },     // 1 → 16px columns, 8px rows
+            2: { x: 'gap-x-8', y: 'gap-y-4' },     // 2 → 32px columns, 16px rows
+            3: { x: 'gap-x-12', y: 'gap-y-6' },    // 3 → 48px columns, 24px rows
+            4: { x: 'gap-x-16', y: 'gap-y-8' },    // 4 → 64px columns, 32px rows
+            5: { x: 'gap-x-20', y: 'gap-y-10' },   // 5 → 80px columns, 40px rows
+            6: { x: 'gap-x-24', y: 'gap-y-12' },   // 6 → 96px columns, 48px rows
+            7: { x: 'gap-x-28', y: 'gap-y-14' },   // 7 → 112px columns, 56px rows
+            8: { x: 'gap-x-32', y: 'gap-y-16' },   // 8 → 128px columns, 64px rows
+            9: { x: 'gap-x-36', y: 'gap-y-18' },   // 9 → 144px columns, 72px rows
+            10: { x: 'gap-x-40', y: 'gap-y-20' }   // 10 → 160px columns, 80px rows
         };
-        const gapClass = gapClasses[this.settings.tileGap] || 'gap-4';
+        const gaps = gapMapping[this.settings.tileGap] || { x: 'gap-x-4', y: 'gap-y-2' };
         
         // Update quickAccess layout - clean slate with only necessary classes
-        quickAccess.classList.add('grid', gridClass, gapClass, maxWidthClass, 'mx-auto', 'place-items-center');
+        quickAccess.classList.add('grid', gridClass, gaps.x, gaps.y, maxWidthClass, 'mx-auto', 'place-items-center');
         
         // Update folderBookmarks layout if it exists
         if (folderBookmarks) {
             folderBookmarks.className = '';
-            folderBookmarks.classList.add('grid', gridClass, gapClass, maxWidthClass, 'mx-auto', 'place-items-center');
+            folderBookmarks.classList.add('grid', gridClass, gaps.x, gaps.y, maxWidthClass, 'mx-auto', 'place-items-center');
         }
     }
 
