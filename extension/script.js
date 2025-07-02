@@ -1846,9 +1846,7 @@ class BookmarkManager {
         try {
             await navigator.clipboard.writeText(bookmark.url);
             console.log('Bookmark URL copied to clipboard:', bookmark.url);
-            
-            // Optional: Show a brief visual feedback (you could add a toast notification here)
-            // For now, we'll just log it to console
+            this.showCopyNotification();
         } catch (error) {
             console.error('Failed to copy URL to clipboard:', error);
             
@@ -1865,10 +1863,26 @@ class BookmarkManager {
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
                 console.log('Bookmark URL copied to clipboard (fallback method):', bookmark.url);
+                this.showCopyNotification();
             } catch (fallbackError) {
                 console.error('Failed to copy URL with fallback method:', fallbackError);
+                // Don't show notification if both methods failed
             }
         }
+    }
+
+    showCopyNotification() {
+        const notification = document.getElementById('copyNotification');
+        
+        // Show the notification by sliding it in from the right
+        notification.classList.remove('translate-x-full');
+        notification.classList.add('translate-x-0');
+        
+        // Hide the notification after 2 seconds
+        setTimeout(() => {
+            notification.classList.remove('translate-x-0');
+            notification.classList.add('translate-x-full');
+        }, 2000);
     }
 
     async updateFaviconAsync(bookmarkId, url) {
