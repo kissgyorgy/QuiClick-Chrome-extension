@@ -514,6 +514,14 @@ class BookmarkManager {
         const hostname = new URL(url).hostname;
         const origin = new URL(url).origin;
         
+        // Check if we have a cached favicon for this domain
+        const cachedFavicon = await this.getCachedFavicon(hostname);
+        if (cachedFavicon) {
+            return cachedFavicon;
+        }
+        
+        let faviconUrl = null;
+        
         // First try to parse HTML to find declared favicon links
         try {
             const response = await fetch(url);
@@ -543,10 +551,11 @@ class BookmarkManager {
                 for (const selector of faviconSelectors) {
                     const link = doc.querySelector(selector);
                     if (link && link.href) {
-                        const faviconUrl = new URL(link.href, url).href;
-                        // Test if the favicon actually exists
-                        if (await this.testFaviconUrl(faviconUrl)) {
-                            return faviconUrl;
+                        const testUrl = new URL(link.href, url).href;
+                        // Test if the favicon actually exists and download it
+                        const cachedData = await this.downloadAndCacheFavicon(hostname, testUrl);
+                        if (cachedData) {
+                            return cachedData;
                         }
                     }
                 }
@@ -572,14 +581,15 @@ class BookmarkManager {
             `${origin}/favicon.ico`
         ];
 
-        for (const faviconUrl of faviconSources) {
-            if (await this.testFaviconUrl(faviconUrl)) {
-                return faviconUrl;
+        for (const testUrl of faviconSources) {
+            const cachedData = await this.downloadAndCacheFavicon(hostname, testUrl);
+            if (cachedData) {
+                return cachedData;
             }
         }
         
-        // Final fallback to Google favicon service
-        return `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`;
+        // If no favicon found, return null (no fallback)
+        return null;
     }
 
     async testFaviconUrl(url) {
@@ -591,6 +601,72 @@ class BookmarkManager {
             return response.ok || response.type === 'opaque';
         } catch (e) {
             return false;
+        }
+    }
+
+    async getCachedFavicon(hostname) {
+        try {
+            const result = await chrome.storage.local.get(['faviconCache']);
+            const cache = result.faviconCache || {};
+            return cache[hostname] || null;
+        } catch (e) {
+            console.log('Failed to get cached favicon:', e);
+            return null;
+        }
+    }
+
+    async downloadAndCacheFavicon(hostname, faviconUrl) {
+        try {
+            const response = await fetch(faviconUrl);
+            if (!response.ok) {
+                return null;
+            }
+
+            const blob = await response.blob();
+            
+            // Check if it's a valid image
+            if (!blob.type.startsWith('image/')) {
+                return null;
+            }
+
+            // Convert to base64 data URL
+            const base64Data = await this.blobToBase64(blob);
+            
+            // Cache the favicon
+            await this.cacheFavicon(hostname, base64Data);
+            
+            return base64Data;
+        } catch (e) {
+            console.log('Failed to download favicon:', e);
+            return null;
+        }
+    }
+
+    async blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    async cacheFavicon(hostname, base64Data) {
+        try {
+            const result = await chrome.storage.local.get(['faviconCache']);
+            const cache = result.faviconCache || {};
+            cache[hostname] = base64Data;
+            
+            // Limit cache size by removing old entries if needed
+            const cacheKeys = Object.keys(cache);
+            if (cacheKeys.length > 100) {
+                // Remove the oldest 20 entries (simple cleanup)
+                cacheKeys.slice(0, 20).forEach(key => delete cache[key]);
+            }
+            
+            await chrome.storage.local.set({ faviconCache: cache });
+        } catch (e) {
+            console.log('Failed to cache favicon:', e);
         }
     }
 
@@ -824,12 +900,15 @@ class BookmarkManager {
         const hostname = new URL(url).hostname;
         const origin = new URL(url).origin;
         const faviconUrls = [];
-        
-        // Add Google favicon service as first option
-        faviconUrls.push({
-            url: `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`,
-            label: 'Google Favicon Service'
-        });
+
+        // Check if we have a cached favicon for this domain
+        const cachedFavicon = await this.getCachedFavicon(hostname);
+        if (cachedFavicon) {
+            faviconUrls.push({
+                url: cachedFavicon,
+                label: 'Cached Favicon'
+            });
+        }
 
         try {
             const response = await fetch(url);
@@ -933,20 +1012,20 @@ class BookmarkManager {
             faviconElement.appendChild(img);
             faviconElement.appendChild(fallback);
             
-            faviconElement.addEventListener('click', () => {
-                this.selectFavicon(faviconElement, favicon.url);
+            faviconElement.addEventListener('click', async () => {
+                await this.selectFavicon(faviconElement, favicon.url);
             });
             
             faviconOptions.appendChild(faviconElement);
             
             // Auto-select first option
             if (i === 0) {
-                this.selectFavicon(faviconElement, favicon.url);
+                await this.selectFavicon(faviconElement, favicon.url);
             }
         }
     }
 
-    selectFavicon(element, url) {
+    async selectFavicon(element, url) {
         // Remove previous selection
         const currentSelected = document.querySelector('.favicon-option.selected');
         if (currentSelected) {
@@ -959,7 +1038,19 @@ class BookmarkManager {
         element.classList.remove('border-gray-300', 'bg-white');
         element.classList.add('selected', 'border-blue-500', 'bg-blue-50');
         element.style.borderWidth = '2px';
-        this.selectedFavicon = url;
+        
+        // If this is not already a cached favicon (base64 data URL), cache it
+        if (!url.startsWith('data:')) {
+            const hostname = new URL(document.getElementById('bookmarkUrl').value).hostname;
+            const cachedData = await this.downloadAndCacheFavicon(hostname, url);
+            if (cachedData) {
+                this.selectedFavicon = cachedData;
+            } else {
+                this.selectedFavicon = null; // Don't use external URL if caching fails
+            }
+        } else {
+            this.selectedFavicon = url;
+        }
     }
 
     async addBookmark() {
@@ -1496,7 +1587,7 @@ class BookmarkManager {
             const faviconUrl = await this.getHighResolutionFavicon(url);
             const bookmarkIndex = this.bookmarks.findIndex(b => b.id === bookmarkId);
             
-            if (bookmarkIndex !== -1) {
+            if (bookmarkIndex !== -1 && faviconUrl) {
                 this.bookmarks[bookmarkIndex].favicon = faviconUrl;
                 await this.saveBookmarks();
                 
@@ -1510,6 +1601,7 @@ class BookmarkManager {
                         faviconImg.style.display = 'block';
                         fallbackDiv.style.display = 'none';
                         
+                        // Since we're using base64 data URLs, errors should be rare
                         faviconImg.onerror = () => {
                             faviconImg.style.display = 'none';
                             fallbackDiv.style.display = 'block';
