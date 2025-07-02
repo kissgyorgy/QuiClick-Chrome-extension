@@ -148,6 +148,11 @@ class BookmarkManager {
             this.hideContextMenu();
         });
 
+        document.getElementById('copyBookmarkUrl').addEventListener('click', () => {
+            this.copyBookmarkUrl();
+            this.hideContextMenu();
+        });
+
         document.getElementById('deleteBookmark').addEventListener('click', (e) => {
             this.showDeleteConfirmation(e);
             this.hideContextMenu();
@@ -1830,6 +1835,40 @@ class BookmarkManager {
             titleInput.focus();
             titleInput.select();
         }, 100);
+    }
+
+    async copyBookmarkUrl() {
+        if (!this.currentBookmarkId) return;
+        
+        const bookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
+        if (!bookmark) return;
+        
+        try {
+            await navigator.clipboard.writeText(bookmark.url);
+            console.log('Bookmark URL copied to clipboard:', bookmark.url);
+            
+            // Optional: Show a brief visual feedback (you could add a toast notification here)
+            // For now, we'll just log it to console
+        } catch (error) {
+            console.error('Failed to copy URL to clipboard:', error);
+            
+            // Fallback for browsers that don't support navigator.clipboard
+            try {
+                const textArea = document.createElement('textarea');
+                textArea.value = bookmark.url;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                textArea.style.top = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                console.log('Bookmark URL copied to clipboard (fallback method):', bookmark.url);
+            } catch (fallbackError) {
+                console.error('Failed to copy URL with fallback method:', fallbackError);
+            }
+        }
     }
 
     async updateFaviconAsync(bookmarkId, url) {
