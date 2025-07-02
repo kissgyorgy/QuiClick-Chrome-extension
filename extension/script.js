@@ -545,6 +545,29 @@ class BookmarkManager {
         return this.isValidUrl(normalized);
     }
 
+    extractTitleFromDocument(doc) {
+        // Try different title sources in order of preference
+        const titleSources = [
+            'meta[property="og:title"]',
+            'meta[name="twitter:title"]',
+            'title',
+            'h1'
+        ];
+
+        for (const selector of titleSources) {
+            const element = doc.querySelector(selector);
+            if (element) {
+                const title = element.getAttribute('content') || element.textContent || '';
+                const cleanTitle = title.trim();
+                if (cleanTitle) {
+                    return cleanTitle;
+                }
+            }
+        }
+
+        return null;
+    }
+
     async getHighResolutionFavicon(url) {
         const hostname = new URL(url).hostname;
         const origin = new URL(url).origin;
@@ -973,8 +996,14 @@ class BookmarkManager {
         faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
 
         try {
-            const faviconUrls = await this.getAllFaviconUrls(url);
-            this.displayFaviconOptions(faviconUrls);
+            const result = await this.getAllFaviconUrlsAndTitle(url);
+            this.displayFaviconOptions(result.faviconUrls);
+            
+            // Auto-fill title if it's empty and we extracted a title
+            const titleInput = document.getElementById('bookmarkTitle');
+            if (result.pageTitle && (!titleInput.value || titleInput.value.trim() === '')) {
+                titleInput.value = result.pageTitle;
+            }
         } catch (error) {
             faviconOptions.innerHTML = '<div class="text-sm text-red-500 col-span-6 text-center">Failed to load favicon options</div>';
         }
@@ -988,17 +1017,29 @@ class BookmarkManager {
         faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
 
         try {
-            const faviconUrls = await this.getAllFaviconUrls(url);
-            this.displayEditFaviconOptions(faviconUrls);
+            const result = await this.getAllFaviconUrlsAndTitle(url);
+            this.displayEditFaviconOptions(result.faviconUrls);
+            
+            // Auto-fill title if it's empty and we extracted a title
+            const titleInput = document.getElementById('editBookmarkTitle');
+            if (result.pageTitle && (!titleInput.value || titleInput.value.trim() === '')) {
+                titleInput.value = result.pageTitle;
+            }
         } catch (error) {
             faviconOptions.innerHTML = '<div class="text-sm text-red-500 col-span-6 text-center">Failed to load favicon options</div>';
         }
     }
 
     async getAllFaviconUrls(url) {
+        const result = await this.getAllFaviconUrlsAndTitle(url);
+        return result.faviconUrls;
+    }
+
+    async getAllFaviconUrlsAndTitle(url) {
         const hostname = new URL(url).hostname;
         const origin = new URL(url).origin;
         const faviconUrls = [];
+        let pageTitle = null;
 
         // Check if we have a cached favicon for this domain
         const cachedFavicon = await this.getCachedFavicon(hostname);
@@ -1015,6 +1056,9 @@ class BookmarkManager {
                 const html = await response.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
+                
+                // Extract page title
+                pageTitle = this.extractTitleFromDocument(doc);
                 
                 const faviconSelectors = [
                     'link[rel*="icon"][sizes*="192"]',
@@ -1073,7 +1117,10 @@ class BookmarkManager {
             }
         }
 
-        return uniqueUrls;
+        return {
+            faviconUrls: uniqueUrls,
+            pageTitle: pageTitle
+        };
     }
 
     async displayFaviconOptions(faviconUrls) {
