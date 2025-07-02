@@ -516,6 +516,35 @@ class BookmarkManager {
         }
     }
 
+    normalizeUrl(url) {
+        if (!url || !url.trim()) return url;
+        
+        const trimmedUrl = url.trim();
+        
+        // If it already has a protocol, return as is
+        if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
+            return trimmedUrl;
+        }
+        
+        // If it looks like a URL (contains a dot and domain pattern), prefix with https://
+        if (trimmedUrl.includes('.') && /^[a-zA-Z0-9]/.test(trimmedUrl)) {
+            return 'https://' + trimmedUrl;
+        }
+        
+        return trimmedUrl;
+    }
+
+    isValidUrlOrCanBeNormalized(string) {
+        if (!string || !string.trim()) return false;
+        
+        // First check if it's already valid
+        if (this.isValidUrl(string)) return true;
+        
+        // Then check if it can be normalized to a valid URL
+        const normalized = this.normalizeUrl(string);
+        return this.isValidUrl(normalized);
+    }
+
     async getHighResolutionFavicon(url) {
         const hostname = new URL(url).hostname;
         const origin = new URL(url).origin;
@@ -883,7 +912,7 @@ class BookmarkManager {
             clearTimeout(this.faviconDebounceTimer);
         }
 
-        if (!url || !this.isValidUrl(url)) {
+        if (!url || !this.isValidUrlOrCanBeNormalized(url)) {
             document.getElementById('faviconSelection').classList.add('hidden');
             this.selectedFavicon = null;
             return;
@@ -896,7 +925,14 @@ class BookmarkManager {
         faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
 
         this.faviconDebounceTimer = setTimeout(() => {
-            this.loadFaviconOptions(url);
+            const normalizedUrl = this.normalizeUrl(url);
+            
+            // Update the input field with the normalized URL if it changed
+            if (normalizedUrl !== url) {
+                document.getElementById('bookmarkUrl').value = normalizedUrl;
+            }
+            
+            this.loadFaviconOptions(normalizedUrl);
         }, 500);
     }
 
@@ -905,7 +941,7 @@ class BookmarkManager {
             clearTimeout(this.editFaviconDebounceTimer);
         }
 
-        if (!url || !this.isValidUrl(url)) {
+        if (!url || !this.isValidUrlOrCanBeNormalized(url)) {
             document.getElementById('editFaviconSelection').classList.add('hidden');
             this.selectedEditFavicon = null;
             return;
@@ -918,7 +954,14 @@ class BookmarkManager {
         faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
 
         this.editFaviconDebounceTimer = setTimeout(() => {
-            this.loadEditFaviconOptions(url);
+            const normalizedUrl = this.normalizeUrl(url);
+            
+            // Update the input field with the normalized URL if it changed
+            if (normalizedUrl !== url) {
+                document.getElementById('editBookmarkUrl').value = normalizedUrl;
+            }
+            
+            this.loadEditFaviconOptions(normalizedUrl);
         }, 500);
     }
 
@@ -1145,7 +1188,8 @@ class BookmarkManager {
         
         // If this is not already a cached favicon (base64 data URL), cache it
         if (!url.startsWith('data:')) {
-            const hostname = new URL(document.getElementById('bookmarkUrl').value).hostname;
+            const normalizedUrl = this.normalizeUrl(document.getElementById('bookmarkUrl').value);
+            const hostname = new URL(normalizedUrl).hostname;
             const cachedData = await this.downloadAndCacheFavicon(hostname, url);
             if (cachedData) {
                 this.selectedFavicon = cachedData;
@@ -1173,7 +1217,8 @@ class BookmarkManager {
         
         // If this is not already a cached favicon (base64 data URL), cache it
         if (!url.startsWith('data:')) {
-            const hostname = new URL(document.getElementById('editBookmarkUrl').value).hostname;
+            const normalizedUrl = this.normalizeUrl(document.getElementById('editBookmarkUrl').value);
+            const hostname = new URL(normalizedUrl).hostname;
             const cachedData = await this.downloadAndCacheFavicon(hostname, url);
             if (cachedData) {
                 this.selectedEditFavicon = cachedData;
@@ -1187,7 +1232,8 @@ class BookmarkManager {
 
     async addBookmark() {
         const title = document.getElementById('bookmarkTitle').value.trim();
-        const url = document.getElementById('bookmarkUrl').value.trim();
+        const rawUrl = document.getElementById('bookmarkUrl').value.trim();
+        const url = this.normalizeUrl(rawUrl);
 
         if (!title || !url) return;
 
@@ -1647,7 +1693,8 @@ class BookmarkManager {
         }
         
         const title = document.getElementById('editBookmarkTitle').value.trim();
-        const url = document.getElementById('editBookmarkUrl').value.trim();
+        const rawUrl = document.getElementById('editBookmarkUrl').value.trim();
+        const url = this.normalizeUrl(rawUrl);
 
         console.log('Form values:', { title, url });
 
