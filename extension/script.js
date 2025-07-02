@@ -1878,22 +1878,22 @@ class BookmarkManager {
         // Show the notification container
         notification.classList.remove('hidden');
         
-        // Animate the notification content sliding down and fading in
+        // Animate the notification content sliding in from the right
         setTimeout(() => {
-            notificationContent.classList.remove('-translate-y-full', 'opacity-0');
-            notificationContent.classList.add('translate-y-0', 'opacity-100');
+            notificationContent.classList.remove('translate-x-full');
+            notificationContent.classList.add('translate-x-0');
         }, 10);
         
-        // Hide the notification after 3 seconds
+        // Hide the notification after 2 seconds
         setTimeout(() => {
-            notificationContent.classList.remove('translate-y-0', 'opacity-100');
-            notificationContent.classList.add('-translate-y-full', 'opacity-0');
+            notificationContent.classList.remove('translate-x-0');
+            notificationContent.classList.add('translate-x-full');
             
             // Hide the container after animation completes
             setTimeout(() => {
                 notification.classList.add('hidden');
             }, 300);
-        }, 3000);
+        }, 2000);
     }
 
     async updateFaviconAsync(bookmarkId, url) {
