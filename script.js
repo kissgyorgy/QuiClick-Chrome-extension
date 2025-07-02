@@ -1873,16 +1873,27 @@ class BookmarkManager {
 
     showCopyNotification() {
         const notification = document.getElementById('copyNotification');
+        const notificationContent = notification.querySelector('div');
         
-        // Show the notification by sliding it in from the right
-        notification.classList.remove('translate-x-full');
-        notification.classList.add('translate-x-0');
+        // Show the notification container
+        notification.classList.remove('hidden');
         
-        // Hide the notification after 2 seconds
+        // Animate the notification content sliding down and fading in
         setTimeout(() => {
-            notification.classList.remove('translate-x-0');
-            notification.classList.add('translate-x-full');
-        }, 2000);
+            notificationContent.classList.remove('-translate-y-full', 'opacity-0');
+            notificationContent.classList.add('translate-y-0', 'opacity-100');
+        }, 10);
+        
+        // Hide the notification after 3 seconds
+        setTimeout(() => {
+            notificationContent.classList.remove('translate-y-0', 'opacity-100');
+            notificationContent.classList.add('-translate-y-full', 'opacity-0');
+            
+            // Hide the container after animation completes
+            setTimeout(() => {
+                notification.classList.add('hidden');
+            }, 300);
+        }, 3000);
     }
 
     async updateFaviconAsync(bookmarkId, url) {
