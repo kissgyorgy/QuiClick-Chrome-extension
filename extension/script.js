@@ -858,6 +858,13 @@ class BookmarkManager {
 
     showAddBookmarkModal() {
         document.getElementById('addBookmarkModal').classList.remove('hidden');
+        
+        // Show favicon selection UI immediately with empty state
+        const faviconSelection = document.getElementById('faviconSelection');
+        const faviconOptions = document.getElementById('faviconOptions');
+        faviconSelection.classList.remove('hidden');
+        faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Enter a URL to load favicon options</div>';
+        
         document.getElementById('bookmarkTitle').focus();
     }
 
