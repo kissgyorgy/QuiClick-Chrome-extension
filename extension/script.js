@@ -11,7 +11,9 @@ class BookmarkManager {
         this.isDuplicateMode = false;
         this.duplicatedBookmarkId = null;
         this.selectedFavicon = null;
+        this.selectedEditFavicon = null;
         this.faviconDebounceTimer = null;
+        this.editFaviconDebounceTimer = null;
         this.syncAvailable = false;
         this.settings = {
             showTitles: true,
@@ -90,6 +92,10 @@ class BookmarkManager {
             this.handleUrlInputChange(e.target.value);
         });
 
+        // Edit URL input change for favicon loading
+        document.getElementById('editBookmarkUrl').addEventListener('input', (e) => {
+            this.handleEditUrlInputChange(e.target.value);
+        });
 
         // Remove view toggle listeners since we only have favicon view now
 
@@ -881,6 +887,22 @@ class BookmarkManager {
         }, 500);
     }
 
+    handleEditUrlInputChange(url) {
+        if (this.editFaviconDebounceTimer) {
+            clearTimeout(this.editFaviconDebounceTimer);
+        }
+
+        if (!url || !this.isValidUrl(url)) {
+            document.getElementById('editFaviconSelection').classList.add('hidden');
+            this.selectedEditFavicon = null;
+            return;
+        }
+
+        this.editFaviconDebounceTimer = setTimeout(() => {
+            this.loadEditFaviconOptions(url);
+        }, 500);
+    }
+
     async loadFaviconOptions(url) {
         const faviconSelection = document.getElementById('faviconSelection');
         const faviconOptions = document.getElementById('faviconOptions');
@@ -891,6 +913,21 @@ class BookmarkManager {
         try {
             const faviconUrls = await this.getAllFaviconUrls(url);
             this.displayFaviconOptions(faviconUrls);
+        } catch (error) {
+            faviconOptions.innerHTML = '<div class="text-sm text-red-500 col-span-6 text-center">Failed to load favicon options</div>';
+        }
+    }
+
+    async loadEditFaviconOptions(url) {
+        const faviconSelection = document.getElementById('editFaviconSelection');
+        const faviconOptions = document.getElementById('editFaviconOptions');
+        
+        faviconSelection.classList.remove('hidden');
+        faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
+
+        try {
+            const faviconUrls = await this.getAllFaviconUrls(url);
+            this.displayEditFaviconOptions(faviconUrls);
         } catch (error) {
             faviconOptions.innerHTML = '<div class="text-sm text-red-500 col-span-6 text-center">Failed to load favicon options</div>';
         }
@@ -1025,6 +1062,54 @@ class BookmarkManager {
         }
     }
 
+    async displayEditFaviconOptions(faviconUrls) {
+        const faviconOptions = document.getElementById('editFaviconOptions');
+        
+        if (faviconUrls.length === 0) {
+            faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">No favicon options found</div>';
+            return;
+        }
+
+        faviconOptions.innerHTML = '';
+        
+        for (let i = 0; i < faviconUrls.length; i++) {
+            const favicon = faviconUrls[i];
+            const faviconElement = document.createElement('div');
+            faviconElement.className = 'edit-favicon-option w-10 h-10 border border-gray-300 rounded cursor-pointer hover:border-blue-500 flex items-center justify-center bg-white transition-colors';
+            faviconElement.title = favicon.label;
+            faviconElement.dataset.faviconUrl = favicon.url;
+            
+            const img = document.createElement('img');
+            img.src = favicon.url;
+            img.className = 'w-8 h-8 rounded';
+            img.style.display = 'block';
+            
+            const fallback = document.createElement('div');
+            fallback.className = 'w-8 h-8 bg-gray-300 rounded flex items-center justify-center text-xs text-gray-600';
+            fallback.textContent = '?';
+            fallback.style.display = 'none';
+            
+            img.onerror = () => {
+                img.style.display = 'none';
+                fallback.style.display = 'flex';
+            };
+            
+            faviconElement.appendChild(img);
+            faviconElement.appendChild(fallback);
+            
+            faviconElement.addEventListener('click', async () => {
+                await this.selectEditFavicon(faviconElement, favicon.url);
+            });
+            
+            faviconOptions.appendChild(faviconElement);
+            
+            // Auto-select first option
+            if (i === 0) {
+                await this.selectEditFavicon(faviconElement, favicon.url);
+            }
+        }
+    }
+
     async selectFavicon(element, url) {
         // Remove previous selection
         const currentSelected = document.querySelector('.favicon-option.selected');
@@ -1050,6 +1135,34 @@ class BookmarkManager {
             }
         } else {
             this.selectedFavicon = url;
+        }
+    }
+
+    async selectEditFavicon(element, url) {
+        // Remove previous selection
+        const currentSelected = document.querySelector('.edit-favicon-option.selected');
+        if (currentSelected) {
+            currentSelected.classList.remove('selected', 'border-blue-500', 'bg-blue-50');
+            currentSelected.classList.add('border-gray-300', 'bg-white');
+            currentSelected.style.borderWidth = '1px';
+        }
+        
+        // Add selection to new element
+        element.classList.remove('border-gray-300', 'bg-white');
+        element.classList.add('selected', 'border-blue-500', 'bg-blue-50');
+        element.style.borderWidth = '2px';
+        
+        // If this is not already a cached favicon (base64 data URL), cache it
+        if (!url.startsWith('data:')) {
+            const hostname = new URL(document.getElementById('editBookmarkUrl').value).hostname;
+            const cachedData = await this.downloadAndCacheFavicon(hostname, url);
+            if (cachedData) {
+                this.selectedEditFavicon = cachedData;
+            } else {
+                this.selectedEditFavicon = null; // Don't use external URL if caching fails
+            }
+        } else {
+            this.selectedEditFavicon = url;
         }
     }
 
@@ -1434,6 +1547,9 @@ class BookmarkManager {
         // Position the modal near the bookmark being edited
         this.positionEditModal(modal);
         
+        // Trigger favicon loading for the current URL
+        this.handleEditUrlInputChange(bookmark.url);
+        
         modal.classList.remove('hidden');
         document.getElementById('editBookmarkTitle').focus();
     }
@@ -1477,7 +1593,12 @@ class BookmarkManager {
         modal.classList.remove('z-70', 'z-80', 'z-90');
         modal.classList.add('z-60');
         document.getElementById('editBookmarkForm').reset();
+        document.getElementById('editFaviconSelection').classList.add('hidden');
+        this.selectedEditFavicon = null;
         this.currentBookmarkId = null;
+        if (this.editFaviconDebounceTimer) {
+            clearTimeout(this.editFaviconDebounceTimer);
+        }
         this.isDuplicateMode = false;
         this.duplicatedBookmarkId = null;
     }
@@ -1521,11 +1642,20 @@ class BookmarkManager {
         const oldUrl = this.bookmarks[bookmarkIndex].url;
 
         console.log('Updating bookmark...');
-        this.bookmarks[bookmarkIndex] = {
+        
+        // Check if a favicon was selected, otherwise keep the existing one
+        const updatedBookmark = {
             ...this.bookmarks[bookmarkIndex],
             title,
             url
         };
+        
+        // If a favicon was selected in the edit form, use it
+        if (this.selectedEditFavicon !== null) {
+            updatedBookmark.favicon = this.selectedEditFavicon;
+        }
+        
+        this.bookmarks[bookmarkIndex] = updatedBookmark;
 
         console.log('Saving bookmarks...');
         await this.saveBookmarks();
@@ -1541,7 +1671,8 @@ class BookmarkManager {
         console.log('Hiding modal...');
         this.hideEditBookmarkModal();
         
-        if (url !== oldUrl) {
+        // Only update favicon async if no favicon was manually selected and URL changed
+        if (url !== oldUrl && this.selectedEditFavicon === null) {
             this.updateFaviconAsync(this.currentBookmarkId, url);
         }
         console.log('Update complete');
