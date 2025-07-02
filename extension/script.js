@@ -882,6 +882,12 @@ class BookmarkManager {
             return;
         }
 
+        // Show favicon selection UI immediately
+        const faviconSelection = document.getElementById('faviconSelection');
+        const faviconOptions = document.getElementById('faviconOptions');
+        faviconSelection.classList.remove('hidden');
+        faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
+
         this.faviconDebounceTimer = setTimeout(() => {
             this.loadFaviconOptions(url);
         }, 500);
@@ -897,6 +903,12 @@ class BookmarkManager {
             this.selectedEditFavicon = null;
             return;
         }
+
+        // Show favicon selection UI immediately
+        const faviconSelection = document.getElementById('editFaviconSelection');
+        const faviconOptions = document.getElementById('editFaviconOptions');
+        faviconSelection.classList.remove('hidden');
+        faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
 
         this.editFaviconDebounceTimer = setTimeout(() => {
             this.loadEditFaviconOptions(url);
@@ -1546,6 +1558,12 @@ class BookmarkManager {
         
         // Position the modal near the bookmark being edited
         this.positionEditModal(modal);
+        
+        // Show favicon selection UI immediately
+        const faviconSelection = document.getElementById('editFaviconSelection');
+        const faviconOptions = document.getElementById('editFaviconOptions');
+        faviconSelection.classList.remove('hidden');
+        faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
         
         // Trigger favicon loading for the current URL
         this.handleEditUrlInputChange(bookmark.url);
