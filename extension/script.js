@@ -32,6 +32,9 @@ class BookmarkManager {
         this.setupEventListeners();
         this.updateTilesPerRowCSS(this.settings.tilesPerRow);
         this.renderQuickAccess();
+        
+        // Clean up unused favicons on startup
+        await this.cleanupUnusedFavicons();
     }
 
     async checkSyncAvailability() {
@@ -730,6 +733,43 @@ class BookmarkManager {
             await chrome.storage.local.set({ faviconCache: cache });
         } catch (e) {
             console.log('Failed to cache favicon:', e);
+        }
+    }
+
+    async cleanupUnusedFavicons() {
+        try {
+            const result = await chrome.storage.local.get(['faviconCache']);
+            const cache = result.faviconCache || {};
+            
+            // Get all hostnames currently used by bookmarks
+            const usedHostnames = new Set();
+            for (const bookmark of this.bookmarks) {
+                if (bookmark.url) {
+                    try {
+                        const hostname = new URL(bookmark.url).hostname;
+                        usedHostnames.add(hostname);
+                    } catch (e) {
+                        // Invalid URL, skip
+                    }
+                }
+            }
+            
+            // Remove cached favicons for hostnames no longer used
+            const cacheKeys = Object.keys(cache);
+            let removed = 0;
+            for (const hostname of cacheKeys) {
+                if (!usedHostnames.has(hostname)) {
+                    delete cache[hostname];
+                    removed++;
+                }
+            }
+            
+            if (removed > 0) {
+                await chrome.storage.local.set({ faviconCache: cache });
+                console.log(`Cleaned up ${removed} unused favicons from cache`);
+            }
+        } catch (e) {
+            console.log('Failed to cleanup favicon cache:', e);
         }
     }
 
@@ -2022,6 +2062,9 @@ class BookmarkManager {
             await this.saveBookmarks();
             this.renderQuickAccess();
             
+            // Clean up unused favicons after deletion
+            await this.cleanupUnusedFavicons();
+            
             // If we're in a folder modal and the deleted bookmark was in that folder, update the folder view
             if (this.openFolderId && deletedBookmark && deletedBookmark.folderId === this.openFolderId) {
                 this.renderFolderBookmarks(this.openFolderId);
@@ -2069,6 +2112,7 @@ class BookmarkManager {
     async deleteBookmarkById(bookmarkId) {
         this.bookmarks = this.bookmarks.filter(b => b.id !== bookmarkId);
         await this.saveBookmarks();
+        await this.cleanupUnusedFavicons();
     }
 
     // Bookmark highlighting methods
