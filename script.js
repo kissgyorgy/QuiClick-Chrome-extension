@@ -1096,6 +1096,19 @@ class BookmarkManager {
             console.log('Could not parse HTML for favicons');
         }
         
+        // Add alternative favicon services (these work better for authentication-protected sites)
+        const alternativeSources = [
+            { url: `https://icons.duckduckgo.com/ip3/${hostname}.ico`, label: 'DuckDuckGo Favicon' },
+            { url: `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`, label: 'Google Favicon (64px)' },
+        ];
+
+        for (const {url: faviconUrl, label} of alternativeSources) {
+            faviconUrls.push({
+                url: faviconUrl,
+                label: label
+            });
+        }
+
         // Add common favicon paths
         const commonPaths = [
             { path: '/apple-touch-icon.png', label: 'Apple Touch Icon' },
@@ -1158,6 +1171,9 @@ class BookmarkManager {
             img.onerror = () => {
                 img.style.display = 'none';
                 fallback.style.display = 'flex';
+                // Mark this favicon as problematic
+                faviconElement.classList.add('favicon-error');
+                faviconElement.title = favicon.label + ' (failed to load)';
             };
             
             faviconElement.appendChild(img);
@@ -1206,6 +1222,9 @@ class BookmarkManager {
             img.onerror = () => {
                 img.style.display = 'none';
                 fallback.style.display = 'flex';
+                // Mark this favicon as problematic
+                faviconElement.classList.add('favicon-error');
+                faviconElement.title = favicon.label + ' (failed to load)';
             };
             
             faviconElement.appendChild(img);
