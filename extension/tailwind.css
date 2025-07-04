@@ -26,6 +26,7 @@
     --color-green-200: oklch(0.925 0.084 155.995);
     --color-green-500: oklch(0.723 0.219 149.579);
     --color-green-600: oklch(0.627 0.194 149.214);
+    --color-green-700: oklch(0.527 0.154 150.069);
     --color-blue-50: oklch(0.97 0.014 254.604);
     --color-blue-100: oklch(0.932 0.032 255.585);
     --color-blue-400: oklch(0.707 0.165 254.624);
@@ -938,6 +939,9 @@
   .text-green-600 {
     color: var(--color-green-600);
   }
+  .text-green-700 {
+    color: var(--color-green-700);
+  }
   .text-orange-600 {
     color: var(--color-orange-600);
   }
@@ -1193,6 +1197,11 @@
   text-align: center;
   vertical-align: middle;
   font-family: monospace;
+}
+.favicon-error {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2 !important;
+  opacity: 0.7;
 }
 @keyframes modalFadeIn {
   from {
