@@ -2397,16 +2397,24 @@ class BookmarkManager {
 
     async confirmImport() {
         try {
-            // Hide modal first
+            // Check if import data is available
+            if (!this.pendingImportData) {
+                throw new Error('No import data available');
+            }
+
+            // Store import data before modal cleanup
+            const importData = this.pendingImportData;
+
+            // Hide modal (this clears pendingImportData)
             this.hideImportConfirmModal();
 
             // Backup current data before import
             await this.backupCurrentData();
 
             // Import the data
-            this.bookmarks = this.pendingImportData.bookmarks || [];
-            this.folders = this.pendingImportData.folders || [];
-            this.settings = { ...this.settings, ...this.pendingImportData.settings };
+            this.bookmarks = importData.bookmarks || [];
+            this.folders = importData.folders || [];
+            this.settings = { ...this.settings, ...importData.settings };
 
             // Save imported data
             await this.saveBookmarks();
