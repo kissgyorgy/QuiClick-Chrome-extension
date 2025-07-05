@@ -73,6 +73,11 @@ class BookmarkManager {
             this.showAddBookmarkModal();
         });
 
+        // Export button
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            this.exportAllData();
+        });
+
         // Create folder button
         document.getElementById('createFolderBtn').addEventListener('click', () => {
             this.showCreateFolderModal();
@@ -2213,6 +2218,35 @@ class BookmarkManager {
     async saveSettings() {
         // Save current settings to storage
         await this.saveSettingsToStorage();
+    }
+
+    async exportAllData() {
+        try {
+            // Gather all data from storage
+            const data = {
+                bookmarks: this.bookmarks,
+                folders: this.folders,
+                settings: this.settings,
+                exportDate: new Date().toISOString(),
+                version: "1.0"
+            };
+
+            // Create blob and download
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `youtab-bookmarks-export-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            console.log('Export completed successfully');
+        } catch (error) {
+            console.error('Export failed:', error);
+            alert('Export failed. Please try again.');
+        }
     }
 
     updateTilesPerRowCSS(tilesPerRow) {
