@@ -310,6 +310,41 @@
         </div>
     </div>
 
+    <!-- Import Confirmation Modal -->
+    <div id="importConfirmModal" class="modal-backdrop fixed inset-0 hidden flex items-center justify-center z-50">
+        <div class="modal-content rounded-xl p-6 w-96 mx-4">
+            <h3 class="text-lg font-semibold text-custom-text mb-4">Confirm Import</h3>
+            <div class="mb-4">
+                <p class="text-sm text-gray-600 mb-3">Import data from <span id="importFileName" class="font-medium">filename.json</span>?</p>
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                    <div class="text-sm text-amber-800">
+                        <p class="font-medium mb-1">This will replace your current data:</p>
+                        <ul class="space-y-1">
+                            <li>• <span id="importBookmarkCount">0</span> bookmarks</li>
+                            <li>• <span id="importFolderCount">0</span> folders</li>
+                            <li>• Settings</li>
+                        </ul>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500">Current data will be backed up automatically before import.</p>
+            </div>
+            <div class="flex space-x-3">
+                <button id="cancelImportBtn" class="flex-1 px-3 py-2 border border-custom-border rounded-lg text-custom-text hover:bg-gray-50 transition-colors cursor-pointer font-bold text-sm">Cancel</button>
+                <button id="confirmImportBtn" class="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer font-bold text-sm">Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Success Notification -->
+    <div id="importNotification" class="hidden fixed top-20 right-4 z-50">
+        <div class="bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 rounded-lg shadow-sm flex items-center space-x-2 transform translate-x-full transition-transform duration-300 ease-in-out">
+            <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span class="text-sm">Data imported successfully</span>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>

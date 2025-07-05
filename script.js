@@ -83,6 +83,22 @@ class BookmarkManager {
             this.importAllData();
         });
 
+        // Import modal buttons
+        document.getElementById('confirmImportBtn').addEventListener('click', () => {
+            this.confirmImport();
+        });
+
+        document.getElementById('cancelImportBtn').addEventListener('click', () => {
+            this.hideImportConfirmModal();
+        });
+
+        // Import modal backdrop click
+        document.getElementById('importConfirmModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) {
+                this.hideImportConfirmModal();
+            }
+        });
+
         // Create folder button
         document.getElementById('createFolderBtn').addEventListener('click', () => {
             this.showCreateFolderModal();
@@ -2277,37 +2293,8 @@ class BookmarkManager {
                         throw new Error('Invalid import file format');
                     }
 
-                    // Confirm import action
-                    const confirmImport = confirm(
-                        `Import data from ${file.name}?\n\n` +
-                        `This will replace your current data:\n` +
-                        `• ${importData.bookmarks?.length || 0} bookmarks\n` +
-                        `• ${importData.folders?.length || 0} folders\n` +
-                        `• Settings\n\n` +
-                        `Current data will be backed up automatically.`
-                    );
-
-                    if (!confirmImport) return;
-
-                    // Backup current data before import
-                    await this.backupCurrentData();
-
-                    // Import the data
-                    this.bookmarks = importData.bookmarks || [];
-                    this.folders = importData.folders || [];
-                    this.settings = { ...this.settings, ...importData.settings };
-
-                    // Save imported data
-                    await this.saveBookmarks();
-                    await this.saveSettingsToStorage();
-
-                    // Update UI
-                    this.loadCurrentSettingsIntoForm();
-                    this.updateTilesPerRowCSS(this.settings.tilesPerRow);
-                    this.renderQuickAccess();
-
-                    alert('Import completed successfully!');
-                    console.log('Import completed successfully');
+                    // Show import confirmation modal
+                    this.showImportConfirmModal(file.name, importData, fileInput);
                 } catch (error) {
                     console.error('Import failed:', error);
                     alert(`Import failed: ${error.message}`);
@@ -2372,6 +2359,87 @@ class BookmarkManager {
         } catch (error) {
             console.warn('Backup failed:', error);
         }
+    }
+
+    showImportConfirmModal(fileName, importData, fileInput) {
+        // Store import data for later use
+        this.pendingImportData = importData;
+        this.pendingFileInput = fileInput;
+
+        // Update modal content
+        document.getElementById('importFileName').textContent = fileName;
+        document.getElementById('importBookmarkCount').textContent = importData.bookmarks?.length || 0;
+        document.getElementById('importFolderCount').textContent = importData.folders?.length || 0;
+
+        // Show modal
+        document.getElementById('importConfirmModal').classList.remove('hidden');
+    }
+
+    hideImportConfirmModal() {
+        document.getElementById('importConfirmModal').classList.add('hidden');
+        
+        // Clean up stored data and file input
+        if (this.pendingFileInput) {
+            document.body.removeChild(this.pendingFileInput);
+            this.pendingFileInput = null;
+        }
+        this.pendingImportData = null;
+    }
+
+    async confirmImport() {
+        try {
+            // Hide modal first
+            this.hideImportConfirmModal();
+
+            // Backup current data before import
+            await this.backupCurrentData();
+
+            // Import the data
+            this.bookmarks = this.pendingImportData.bookmarks || [];
+            this.folders = this.pendingImportData.folders || [];
+            this.settings = { ...this.settings, ...this.pendingImportData.settings };
+
+            // Save imported data
+            await this.saveBookmarks();
+            await this.saveSettingsToStorage();
+
+            // Update UI
+            this.loadCurrentSettingsIntoForm();
+            this.updateTilesPerRowCSS(this.settings.tilesPerRow);
+            this.renderQuickAccess();
+
+            // Show success notification
+            this.showImportNotification();
+            console.log('Import completed successfully');
+        } catch (error) {
+            console.error('Import failed:', error);
+            alert(`Import failed: ${error.message}`);
+        }
+    }
+
+    showImportNotification() {
+        const notification = document.getElementById('importNotification');
+        const notificationContent = notification.querySelector('div');
+        
+        // Show the notification container
+        notification.classList.remove('hidden');
+        
+        // Animate the notification content sliding in from the right
+        setTimeout(() => {
+            notificationContent.classList.remove('translate-x-full');
+            notificationContent.classList.add('translate-x-0');
+        }, 10);
+
+        // Hide after 3 seconds
+        setTimeout(() => {
+            notificationContent.classList.add('translate-x-full');
+            notificationContent.classList.remove('translate-x-0');
+            
+            // Hide the container after animation completes
+            setTimeout(() => {
+                notification.classList.add('hidden');
+            }, 300);
+        }, 3000);
     }
 
     updateTilesPerRowCSS(tilesPerRow) {
