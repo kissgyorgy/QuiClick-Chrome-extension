@@ -2298,10 +2298,9 @@ class BookmarkManager {
                 } catch (error) {
                     console.error('Import failed:', error);
                     alert(`Import failed: ${error.message}`);
+                    // Clean up on error
+                    this.cleanupFileInput(fileInput);
                 }
-
-                // Clean up
-                document.body.removeChild(fileInput);
             });
 
             // Trigger file dialog
@@ -2380,10 +2379,20 @@ class BookmarkManager {
         
         // Clean up stored data and file input
         if (this.pendingFileInput) {
-            document.body.removeChild(this.pendingFileInput);
+            this.cleanupFileInput(this.pendingFileInput);
             this.pendingFileInput = null;
         }
         this.pendingImportData = null;
+    }
+
+    cleanupFileInput(fileInput) {
+        try {
+            if (fileInput && fileInput.parentNode) {
+                fileInput.parentNode.removeChild(fileInput);
+            }
+        } catch (error) {
+            console.warn('File input cleanup failed:', error);
+        }
     }
 
     async confirmImport() {
