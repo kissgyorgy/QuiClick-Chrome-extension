@@ -27,8 +27,7 @@ class BookmarkManager {
     async init() {
         await this.checkSyncAvailability();
         await this.loadSettings();
-        await this.loadBookmarks();
-        await this.loadFolders();
+        await this.loadBookmarks(); // Now loads both bookmarks and folders
         this.setupEventListeners();
         this.updateTilesPerRowCSS(this.settings.tilesPerRow);
         this.renderQuickAccess();
@@ -807,95 +806,48 @@ class BookmarkManager {
             let result;
             let loadedFromSync = false;
             
-            // Try to load from sync storage first (only if sync is available)
+            // Try to load from both sync and local storage to find the most recent data
+            let syncResult = null;
+            let localResult = null;
+            
             if (this.syncAvailable) {
                 try {
-                    result = await chrome.storage.sync.get(['bookmarks']);
-                    if (result.bookmarks && result.bookmarks.length > 0) {
-                        console.log('Loaded bookmarks from sync storage');
-                        loadedFromSync = true;
-                    } else {
-                        throw new Error('No bookmarks in sync storage');
-                    }
+                    syncResult = await chrome.storage.sync.get(['bookmarks', 'folders']);
                 } catch (syncError) {
-                    console.log('Sync storage error, falling back to local:', syncError.message);
+                    console.log('Sync storage error:', syncError.message);
                 }
             }
             
-            if (!loadedFromSync) {
-                // Fallback to local storage
-                console.log('Loading from local storage');
-                result = await chrome.storage.local.get(['bookmarks']);
-                
-                // If we have bookmarks in local but not sync, try to migrate them (only if sync is available)
-                if (this.syncAvailable && result.bookmarks && result.bookmarks.length > 0) {
-                    console.log('Found bookmarks in local storage, attempting to migrate to sync');
-                    const bookmarksData = JSON.stringify(result.bookmarks);
-                    const sizeInBytes = new TextEncoder().encode(bookmarksData).length;
-                    
-                    if (sizeInBytes <= 8000) {
-                        try {
-                            await chrome.storage.sync.set({ bookmarks: result.bookmarks });
-                            console.log('Successfully migrated bookmarks to sync storage');
-                        } catch (migrationError) {
-                            console.log('Migration to sync failed, keeping in local storage');
-                        }
-                    } else {
-                        console.log('Bookmarks too large for sync storage, keeping in local storage');
-                    }
-                }
+            try {
+                localResult = await chrome.storage.local.get(['bookmarks', 'folders']);
+            } catch (localError) {
+                console.log('Local storage error:', localError.message);
+            }
+            
+            // Determine which storage has the most recent data
+            // If both exist, prefer local storage since that's where saves go when data is too large
+            if (localResult && localResult.bookmarks && localResult.bookmarks.length > 0) {
+                console.log('Loading bookmarks from local storage');
+                result = localResult;
+            } else if (syncResult && syncResult.bookmarks && syncResult.bookmarks.length > 0) {
+                console.log('Loading bookmarks from sync storage');
+                result = syncResult;
+                loadedFromSync = true;
+            } else {
+                console.log('No bookmarks found in storage, using defaults');
+                result = {};
             }
             
             this.bookmarks = result.bookmarks || await this.getDefaultBookmarks();
+            this.folders = result.folders || [];
+            
         } catch (error) {
             console.log('Error loading bookmarks, using default bookmarks');
             this.bookmarks = await this.getDefaultBookmarks();
-        }
-    }
-
-    async loadFolders() {
-        try {
-            let result;
-            let loadedFromSync = false;
-            
-            // Try to load from sync storage first (only if sync is available)
-            if (this.syncAvailable) {
-                try {
-                    result = await chrome.storage.sync.get(['folders']);
-                    if (result.folders && result.folders.length > 0) {
-                        console.log('Loaded folders from sync storage');
-                        loadedFromSync = true;
-                    } else {
-                        throw new Error('No folders in sync storage');
-                    }
-                } catch (syncError) {
-                    console.log('Sync storage error for folders, falling back to local:', syncError.message);
-                }
-            }
-            
-            if (!loadedFromSync) {
-                // Fallback to local storage
-                console.log('Loading folders from local storage');
-                result = await chrome.storage.local.get(['folders']);
-                
-                // If we have folders in local but not sync, try to migrate them (only if sync is available)
-                if (this.syncAvailable && result.folders && result.folders.length > 0) {
-                    console.log('Found folders in local storage, attempting to migrate to sync');
-                    try {
-                        await chrome.storage.sync.set({ folders: result.folders });
-                        console.log('Successfully migrated folders to sync storage');
-                    } catch (migrationError) {
-                        console.log('Migration of folders to sync failed, keeping in local storage');
-                    }
-                }
-            }
-            
-            this.folders = result.folders || [];
-        } catch (error) {
-            console.log('Error loading folders, using empty array');
             this.folders = [];
         }
     }
+
 
     async getDefaultBookmarks() {
         const defaultUrls = [
@@ -1664,6 +1616,7 @@ class BookmarkManager {
         // Show bookmark menu items and hide folder menu items
         document.getElementById('editBookmark').classList.remove('hidden');
         document.getElementById('duplicateBookmark').classList.remove('hidden');
+        document.getElementById('copyBookmarkUrl').classList.remove('hidden');
         document.getElementById('deleteBookmark').classList.remove('hidden');
         document.getElementById('renameFolder').classList.add('hidden');
         document.getElementById('deleteFolder').classList.add('hidden');
@@ -2530,6 +2483,7 @@ class BookmarkManager {
         // Hide bookmark menu items and show folder menu items
         document.getElementById('editBookmark').classList.add('hidden');
         document.getElementById('duplicateBookmark').classList.add('hidden');
+        document.getElementById('copyBookmarkUrl').classList.add('hidden');
         document.getElementById('deleteBookmark').classList.add('hidden');
         document.getElementById('renameFolder').classList.remove('hidden');
         document.getElementById('deleteFolder').classList.remove('hidden');
