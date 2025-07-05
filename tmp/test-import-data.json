@@ -1,0 +1,35 @@
+{
+  "bookmarks": [
+    {
+      "id": 1620000000000,
+      "title": "Test Imported Bookmark",
+      "url": "https://example.com/imported",
+      "category": "general",
+      "favicon": "https://www.google.com/s2/favicons?domain=example.com",
+      "dateAdded": "2023-01-01T00:00:00.000Z"
+    },
+    {
+      "id": 1620000000001,
+      "title": "Another Test Bookmark",
+      "url": "https://test.com",
+      "category": "general",
+      "favicon": "https://www.google.com/s2/favicons?domain=test.com",
+      "dateAdded": "2023-01-02T00:00:00.000Z"
+    }
+  ],
+  "folders": [
+    {
+      "id": 1620000001000,
+      "name": "Test Imported Folder",
+      "dateCreated": "2023-01-01T00:00:00.000Z"
+    }
+  ],
+  "settings": {
+    "showTitles": true,
+    "tilesPerRow": 6,
+    "tileGap": 2,
+    "showAddButton": true
+  },
+  "exportDate": "2023-01-01T00:00:00.000Z",
+  "version": "1.0"
+}

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Export</title>
+</head>
+<body>
+    <h1>Test Export Functionality</h1>
+    <button id="testExportBtn">Test Export</button>
+    <div id="output"></div>
+
+    <script>
+        // Mock Chrome storage API
+        const mockBookmarks = [
+            {
+                id: 1620000000000,
+                title: "Test Bookmark",
+                url: "https://example.com",
+                category: "general",
+                favicon: "https://www.google.com/s2/favicons?domain=example.com",
+                dateAdded: "2023-01-01T00:00:00.000Z"
+            }
+        ];
+
+        const mockFolders = [
+            {
+                id: 1620000001000,
+                name: "Test Folder",
+                dateCreated: "2023-01-01T00:00:00.000Z"
+            }
+        ];
+
+        const mockSettings = {
+            showTitles: true,
+            tilesPerRow: 8,
+            tileGap: 1,
+            showAddButton: true
+        };
+
+        // Mock BookmarkManager export method
+        function exportAllData() {
+            try {
+                const data = {
+                    bookmarks: mockBookmarks,
+                    folders: mockFolders,
+                    settings: mockSettings,
+                    exportDate: new Date().toISOString(),
+                    version: "1.0"
+                };
+
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `youtab-bookmarks-export-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                document.getElementById('output').innerHTML = '<p style="color: green;">Export completed successfully!</p>';
+                console.log('Export completed successfully');
+            } catch (error) {
+                document.getElementById('output').innerHTML = '<p style="color: red;">Export failed: ' + error.message + '</p>';
+                console.error('Export failed:', error);
+            }
+        }
+
+        document.getElementById('testExportBtn').addEventListener('click', exportAllData);
+    </script>
+</body>
+</html>
