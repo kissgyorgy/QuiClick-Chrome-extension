@@ -78,6 +78,11 @@ class BookmarkManager {
             this.exportAllData();
         });
 
+        // Import button
+        document.getElementById('importBtn').addEventListener('click', () => {
+            this.importAllData();
+        });
+
         // Create folder button
         document.getElementById('createFolderBtn').addEventListener('click', () => {
             this.showCreateFolderModal();
@@ -2246,6 +2251,126 @@ class BookmarkManager {
         } catch (error) {
             console.error('Export failed:', error);
             alert('Export failed. Please try again.');
+        }
+    }
+
+    async importAllData() {
+        try {
+            // Create file input element
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.json';
+            fileInput.style.display = 'none';
+            document.body.appendChild(fileInput);
+
+            // Handle file selection
+            fileInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                try {
+                    const fileContent = await file.text();
+                    const importData = JSON.parse(fileContent);
+
+                    // Validate import data structure
+                    if (!this.validateImportData(importData)) {
+                        throw new Error('Invalid import file format');
+                    }
+
+                    // Confirm import action
+                    const confirmImport = confirm(
+                        `Import data from ${file.name}?\n\n` +
+                        `This will replace your current data:\n` +
+                        `• ${importData.bookmarks?.length || 0} bookmarks\n` +
+                        `• ${importData.folders?.length || 0} folders\n` +
+                        `• Settings\n\n` +
+                        `Current data will be backed up automatically.`
+                    );
+
+                    if (!confirmImport) return;
+
+                    // Backup current data before import
+                    await this.backupCurrentData();
+
+                    // Import the data
+                    this.bookmarks = importData.bookmarks || [];
+                    this.folders = importData.folders || [];
+                    this.settings = { ...this.settings, ...importData.settings };
+
+                    // Save imported data
+                    await this.saveBookmarks();
+                    await this.saveSettingsToStorage();
+
+                    // Update UI
+                    this.loadCurrentSettingsIntoForm();
+                    this.updateTilesPerRowCSS(this.settings.tilesPerRow);
+                    this.renderQuickAccess();
+
+                    alert('Import completed successfully!');
+                    console.log('Import completed successfully');
+                } catch (error) {
+                    console.error('Import failed:', error);
+                    alert(`Import failed: ${error.message}`);
+                }
+
+                // Clean up
+                document.body.removeChild(fileInput);
+            });
+
+            // Trigger file dialog
+            fileInput.click();
+        } catch (error) {
+            console.error('Import setup failed:', error);
+            alert('Import setup failed. Please try again.');
+        }
+    }
+
+    validateImportData(data) {
+        // Check if data has the expected structure
+        if (!data || typeof data !== 'object') return false;
+        
+        // Validate bookmarks array
+        if (data.bookmarks && !Array.isArray(data.bookmarks)) return false;
+        if (data.bookmarks) {
+            for (const bookmark of data.bookmarks) {
+                if (!bookmark.id || !bookmark.title || !bookmark.url) return false;
+            }
+        }
+
+        // Validate folders array
+        if (data.folders && !Array.isArray(data.folders)) return false;
+        if (data.folders) {
+            for (const folder of data.folders) {
+                if (!folder.id || !folder.name) return false;
+            }
+        }
+
+        // Validate settings object
+        if (data.settings && typeof data.settings !== 'object') return false;
+
+        return true;
+    }
+
+    async backupCurrentData() {
+        try {
+            const backupData = {
+                bookmarks: this.bookmarks,
+                folders: this.folders,
+                settings: this.settings,
+                backupDate: new Date().toISOString(),
+                version: "1.0"
+            };
+
+            // Save backup to local storage with timestamp
+            const backupKey = `backup_${Date.now()}`;
+            await chrome.storage.local.set({
+                [backupKey]: backupData,
+                lastBackup: backupKey
+            });
+
+            console.log('Current data backed up successfully');
+        } catch (error) {
+            console.warn('Backup failed:', error);
         }
     }
 
