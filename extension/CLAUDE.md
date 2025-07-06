@@ -4,114 +4,77 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is **YouTab Bookmarks**, a Chrome browser extension that replaces the new tab page with a modern bookmark management interface. Built with vanilla JavaScript, Tailwind CSS v4, and Chrome Extension API v3.
-
-## Development Commands
-
-### CSS Build Process
-```bash
-# Start CSS compilation in watch mode (primary development command)
-bun run build-css
-
-# Install dependencies
-bun install
-```
-
-The build process compiles Tailwind CSS from `/workspace/src/main.css` to `/workspace/tailwind.css` which is used by the extension.
-
-### Testing the Extension
-Load the extension in Chrome:
-1. Open Chrome and go to `chrome://extensions/`
-2. Enable "Developer mode"
-3. Click "Load unpacked" and select this directory
-4. Open a new tab to see the extension
-
-## Architecture
-
-### Core Components
-
-**BookmarkManager Class** (`/workspace/script.js`):
-- Singleton class managing all bookmark operations
-- Uses Chrome's `chrome.storage.local` API for persistence
-- Handles CRUD operations, UI rendering, and event management
-- Key methods: `loadBookmarks()`, `saveBookmarks()`, `addBookmark()`, `updateBookmark()`, `deleteBookmark()`, `renderQuickAccess()`
-
-**Data Structure**:
-```javascript
-{
-  id: timestamp,
-  title: string,
-  url: string,
-  category: string,
-  favicon: string (Google favicon service URL),
-  dateAdded: ISO string
-}
-```
-
-### UI System
-
-**Modal System**: 
-- Add bookmark modal (`#addBookmarkModal`)
-- Edit bookmark modal (`#editBookmarkModal`) 
-- Context menu (`#contextMenu`) for right-click operations
-
-**Responsive Grid**: Bookmark display uses CSS Grid with 2-10 columns based on screen size
-
-**Event Handling**:
-- Left-click: Navigate to bookmark URL in new tab
-- Right-click: Show context menu with Edit/Delete options
-- Modal backdrop clicks close modals
-
-### Styling Architecture
-
-**Tailwind CSS v4** with custom theme in `/workspace/src/main.css`:
-- Custom CSS properties for theming
-- `--color-custom-bg`, `--color-custom-text`, `--color-custom-border`, `--color-custom-accent`
-- Responsive design with hover states and transitions
-
-## Chrome Extension Configuration
-
-**Manifest v3** (`/workspace/manifest.json`):
-- Permissions: `storage`, `bookmarks`, `activeTab`
-- Overrides new tab page with `newtab.html`
-- Strict CSP for security
-
-## Key Development Patterns
-
-### Async Operations
-All storage operations use async/await with try/catch error handling and fallbacks to default bookmarks.
-
-### Event Listener Management
-Event listeners are set up in `setupEventListeners()` and include:
-- Form submissions for add/edit operations
-- Modal backdrop clicks
-- Context menu interactions
-- Global click handlers for menu hiding
-
-### Favicon Handling
-Uses Google's favicon service with fallback to letter-based avatars when images fail to load.
+QuiClick is a Chrome Browser Extension that replaces the new tab page with a custom bookmark manager. 
+It provides quick access to bookmarks through an organized, tile-based interface with drag-and-drop functionality.
 
 ## Technology Stack
 
-- **Runtime**: Bun (package manager and potential future build tool)
-- **Frontend**: Vanilla JavaScript with TypeScript configuration
-- **Styling**: Tailwind CSS v4 with custom theme
-- **Storage**: Chrome Extension Storage API
-- **Browser API**: Chrome Extension Manifest v3
+- **JavaScript (ES6+)** - Main application logic in single `BookmarkManager` class
+- **HTML5 + CSS3** - Structure and styling
+- **Tailwind CSS v4** - Utility-first CSS framework with custom theme
+- **Chrome Extension API** - Browser integration (Manifest V3)
+- **Bun** - Package manager and build tool
 
-## File Structure
+## Development Commands
 
-- `newtab.html` - Main extension page HTML structure
-- `script.js` - Core bookmark management logic
-- `src/main.css` - Tailwind source with custom theme
-- `tailwind.css` - Compiled CSS output (auto-generated)
-- `manifest.json` - Chrome extension configuration
-- `package.json` - Bun project configuration with CSS build script
+```bash
+# Install dependencies
+bun install
 
-## UI/UX Guidelines
+# Build CSS from source (required after CSS changes)
+bun run build-css
 
-- Always set cursor pointer on every button
+# Package extension for Chrome Web Store
+bun run package
 
-## Development Best Practices
+# Clean build and repackage
+bun run package:clean
+```
 
-- Always use TailwindCSS, don't use custom styles or the style property
+## Key Architecture
+
+### Single Class Design
+- All functionality is contained within the `BookmarkManager` class in `script.js`
+- Event-driven architecture with extensive event listener setup
+- Modal-based UI for all operations (add, edit, delete, settings)
+
+### File Structure
+- `manifest.json` - Chrome extension configuration (Manifest V3)
+- `newtab.html` - Main HTML page that replaces new tab
+- `script.js` - Core application logic (~3000 lines)
+- `src/main.css` - Source CSS with Tailwind imports and custom styles
+- `tailwind.css` - Compiled CSS output (generated, don't edit directly)
+
+### Chrome Extension Integration
+- Uses `chrome.storage.sync` for cross-device synchronization
+- Requires permissions: storage, bookmarks, activeTab, tabs, https://*/*
+- Overrides new tab page via `chrome_url_overrides`
+
+## Development Workflow
+
+### CSS Changes
+1. Edit `src/main.css` (not `tailwind.css`)
+2. Run `bun run build-css` to compile
+3. Refresh extension in Chrome
+
+### Extension Testing
+1. Load unpacked extension in Chrome Developer Mode
+2. Point to project root directory
+3. Refresh extension after changes
+
+### Key Features to Understand
+- **Bookmark Management** - Add, edit, delete, duplicate bookmarks and folders
+- **Drag & Drop** - Reorganize bookmarks and folders
+- **Favicon Handling** - Automatic fetching with custom favicon selection
+- **Export/Import** - JSON-based data backup and restore
+- **Responsive Grid** - Dynamic column layouts (3-12 tiles per row)
+- **3D Visual Effects** - Custom CSS animations and shadows for tiles
+
+## State Management
+
+The BookmarkManager maintains state for:
+- `bookmarks[]` and `folders[]` - Main data arrays
+- `currentBookmarkId/currentFolderId` - Currently selected items
+- `openFolderId` - Currently open folder
+- `isDragging/draggedBookmarkId` - Drag and drop state
+- `settings{}` - User preferences (showTitles, tilesPerRow, tileGap, etc.)
