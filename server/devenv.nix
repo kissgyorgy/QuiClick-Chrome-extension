@@ -1,42 +1,36 @@
-{ pkgs, lib, config, inputs, ... }:
+{ ... }:
 
 {
   # https://devenv.sh/basics/
-  env.GREET = "devenv";
+  env = {
+    FLASK_APP = "quiclick_server.app:app";
+  };
 
   # https://devenv.sh/packages/
-  packages = [ pkgs.git ];
+  packages = [ ];
 
   # https://devenv.sh/languages/
-  # languages.rust.enable = true;
+  languages.python = {
+    enable = true;
+    venv.enable = true;
+    uv = {
+      enable = true;
+      sync = {
+        enable = true;
+        allGroups = true;
+        allExtras = true;
+      };
+    };
+  };
 
   # https://devenv.sh/processes/
   # processes.cargo-watch.exec = "cargo-watch";
 
   # https://devenv.sh/services/
-  # services.postgres.enable = true;
 
   # https://devenv.sh/scripts/
-  scripts.hello.exec = ''
-    echo hello from $GREET
-  '';
-
-  enterShell = ''
-    hello
-    git --version
-  '';
-
-  # https://devenv.sh/tasks/
-  # tasks = {
-  #   "myproj:setup".exec = "mytool build";
-  #   "devenv:enterShell".after = [ "myproj:setup" ];
-  # };
 
   # https://devenv.sh/tests/
-  enterTest = ''
-    echo "Running tests"
-    git --version | grep --color=auto "${pkgs.git.version}"
-  '';
 
   # https://devenv.sh/git-hooks/
   # git-hooks.hooks.shellcheck.enable = true;
