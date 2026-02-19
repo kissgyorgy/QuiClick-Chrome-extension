@@ -25,45 +25,96 @@ class BookmarkManager {
     }
 
     async init() {
-        await this.checkSyncAvailability();
+        await this.checkAuth();
         await this.loadSettings();
         await this.loadBookmarks(); // Now loads both bookmarks and folders
+
+        // If local storage is empty and user is authenticated, pull from server
+        const hasLocalData = this.bookmarks.length > 0 || this.folders.length > 0;
+        if (!hasLocalData && api.isAuthenticated()) {
+            console.log('No local data found, pulling from server...');
+            await this.pullFromServer();
+        }
+
         this.setupEventListeners();
+        this.setupAuthListeners();
         this.updateTilesPerRowCSS(this.settings.tilesPerRow);
         this.renderQuickAccess();
         
-        // Clean up unused favicons on startup
-        await this.cleanupUnusedFavicons();
+        // Clean up unused favicons on startup (only when using local storage)
+        if (!api.isAuthenticated()) {
+            await this.cleanupUnusedFavicons();
+        }
     }
 
-    async checkSyncAvailability() {
+    async checkAuth() {
         try {
-            // Test if sync storage is available and working
-            const testKey = 'syncTest_' + Date.now();
-            const testValue = 'test';
-            
-            await chrome.storage.sync.set({ [testKey]: testValue });
-            const result = await chrome.storage.sync.get([testKey]);
-            await chrome.storage.sync.remove([testKey]);
-            
-            if (result[testKey] === testValue) {
+            const user = await api.checkAuth();
+            if (user) {
                 this.syncAvailable = true;
-                console.log('✅ Chrome sync storage is available and working');
-                console.log('Extension ID:', chrome.runtime.id);
-                console.log('💡 For sync to work: ensure you are signed into Chrome on all devices');
+                console.log('✅ Authenticated as:', user.email);
             } else {
-                throw new Error('Sync test failed');
+                this.syncAvailable = false;
+                console.log('ℹ️ Not signed in — using local storage');
             }
         } catch (error) {
             this.syncAvailable = false;
-            console.log('❌ Chrome sync storage not available:', error.message);
-            console.log('📝 Sync troubleshooting:');
-            console.log('   1. Make sure you are signed into Chrome');
-            console.log('   2. Check Chrome sync settings (chrome://settings/syncSetup)');
-            console.log('   3. Ensure Extensions sync is enabled');
-            console.log('   4. For unpacked extensions, sync may not work across different computers');
+            console.log('ℹ️ Server not available — using local storage');
         }
-        
+        this.updateAuthUI();
+    }
+
+    updateAuthUI() {
+        const loginBtn = document.getElementById('loginBtn');
+        const userInfo = document.getElementById('userInfo');
+        const userName = document.getElementById('userName');
+        const syncButtons = document.getElementById('syncButtons');
+
+        if (api.isAuthenticated() && api.user) {
+            loginBtn.classList.add('hidden');
+            userInfo.classList.remove('hidden');
+            userInfo.style.display = 'flex';
+            userName.textContent = api.user.name || api.user.email;
+            syncButtons.classList.remove('hidden');
+        } else {
+            loginBtn.classList.remove('hidden');
+            loginBtn.style.display = 'flex';
+            userInfo.classList.add('hidden');
+            syncButtons.classList.add('hidden');
+        }
+    }
+
+    setupAuthListeners() {
+        document.getElementById('loginBtn').addEventListener('click', () => {
+            window.open(api.getLoginUrl(), '_blank', 'width=500,height=600');
+            // Poll for auth completion
+            const pollInterval = setInterval(async () => {
+                const user = await api.checkAuth();
+                if (user) {
+                    clearInterval(pollInterval);
+                    this.syncAvailable = true;
+                    this.updateAuthUI();
+                    // Reload data from server
+                    await this.loadSettings();
+                    await this.loadBookmarks();
+                    this.updateTilesPerRowCSS(this.settings.tilesPerRow);
+                    this.renderQuickAccess();
+                }
+            }, 1000);
+            // Stop polling after 5 minutes
+            setTimeout(() => clearInterval(pollInterval), 300000);
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await api.logout();
+            this.syncAvailable = false;
+            this.updateAuthUI();
+            // Reload from local storage
+            await this.loadSettings();
+            await this.loadBookmarks();
+            this.updateTilesPerRowCSS(this.settings.tilesPerRow);
+            this.renderQuickAccess();
+        });
     }
 
 
@@ -199,6 +250,27 @@ class BookmarkManager {
         // Settings button
         document.getElementById('settingsBtn').addEventListener('click', () => {
             this.showSettingsModal();
+        });
+
+        // Sync buttons
+        document.getElementById('pullFromServerBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('pullFromServerBtn');
+            btn.disabled = true;
+            btn.querySelector('span').textContent = 'Pulling...';
+            const ok = await this.pullFromServer();
+            btn.disabled = false;
+            btn.querySelector('span').textContent = ok ? 'Pulled!' : 'Failed';
+            setTimeout(() => { btn.querySelector('span').textContent = 'Pull from Server'; }, 2000);
+        });
+
+        document.getElementById('pushToServerBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('pushToServerBtn');
+            btn.disabled = true;
+            btn.querySelector('span').textContent = 'Pushing...';
+            const ok = await this.pushToServer();
+            btn.disabled = false;
+            btn.querySelector('span').textContent = ok ? 'Pushed!' : 'Failed';
+            setTimeout(() => { btn.querySelector('span').textContent = 'Push to Server'; }, 2000);
         });
 
         // Settings modal events - removed Save/Cancel buttons, settings apply immediately
@@ -828,49 +900,83 @@ class BookmarkManager {
     }
 
     async loadBookmarks() {
+        // Always load from local storage (fast, offline-first)
         try {
-            let result;
-            let loadedFromSync = false;
-            
-            // Try to load from both sync and local storage to find the most recent data
-            let syncResult = null;
-            let localResult = null;
-            
-            if (this.syncAvailable) {
-                try {
-                    syncResult = await chrome.storage.sync.get(['bookmarks', 'folders']);
-                } catch (syncError) {
-                    console.log('Sync storage error:', syncError.message);
-                }
-            }
-            
-            try {
-                localResult = await chrome.storage.local.get(['bookmarks', 'folders']);
-            } catch (localError) {
-                console.log('Local storage error:', localError.message);
-            }
-            
-            // Determine which storage has the most recent data
-            // If both exist, prefer local storage since that's where saves go when data is too large
-            if (localResult && localResult.bookmarks && localResult.bookmarks.length > 0) {
-                console.log('Loading bookmarks from local storage');
-                result = localResult;
-            } else if (syncResult && syncResult.bookmarks && syncResult.bookmarks.length > 0) {
-                console.log('Loading bookmarks from sync storage');
-                result = syncResult;
-                loadedFromSync = true;
-            } else {
-                console.log('No bookmarks found in storage, using defaults');
-                result = {};
-            }
-            
+            const result = await chrome.storage.local.get(['bookmarks', 'folders']);
             this.bookmarks = result.bookmarks || await this.getDefaultBookmarks();
             this.folders = result.folders || [];
-            
+            console.log('Loaded bookmarks from local storage');
         } catch (error) {
-            console.log('Error loading bookmarks, using default bookmarks');
+            console.log('Error loading from local storage:', error.message);
             this.bookmarks = await this.getDefaultBookmarks();
             this.folders = [];
+        }
+    }
+
+    async pullFromServer() {
+        // Pull all data from server and replace local storage
+        if (!api.isAuthenticated()) {
+            console.log('Not authenticated, cannot pull from server');
+            return false;
+        }
+        try {
+            const [bookmarks, folders, settings] = await Promise.all([
+                api.listBookmarks(),
+                api.listFolders(),
+                api.getSettings(),
+            ]);
+            this.bookmarks = bookmarks;
+            this.folders = folders;
+            this.settings = { ...this.settings, ...settings };
+            await this.saveBookmarks();
+            await this.saveSettingsToStorage();
+            this.loadCurrentSettingsIntoForm();
+            this.updateTilesPerRowCSS(this.settings.tilesPerRow);
+            this.renderQuickAccess();
+            console.log('✅ Pulled data from server');
+            return true;
+        } catch (error) {
+            console.error('Error pulling from server:', error);
+            return false;
+        }
+    }
+
+    async pushToServer() {
+        // Push all local data to server via the import endpoint
+        if (!api.isAuthenticated()) return false;
+        try {
+            const exportPayload = {
+                bookmarks: this.bookmarks.map((b, i) => ({
+                    id: b.id,
+                    title: b.title,
+                    url: b.url,
+                    favicon: b.favicon || null,
+                    date_added: b.dateAdded || new Date().toISOString(),
+                    parent_id: b.folderId || null,
+                    position: i,
+                })),
+                folders: this.folders.map((f, i) => ({
+                    id: f.id,
+                    title: f.name,
+                    date_added: f.dateCreated || new Date().toISOString(),
+                    parent_id: null,
+                    position: i,
+                })),
+                settings: {
+                    show_titles: this.settings.showTitles,
+                    tiles_per_row: this.settings.tilesPerRow,
+                    tile_gap: this.settings.tileGap,
+                    show_add_button: this.settings.showAddButton,
+                },
+                export_date: new Date().toISOString(),
+                version: 1,
+            };
+            await api.importData(exportPayload);
+            console.log('✅ Pushed all data to server');
+            return true;
+        } catch (error) {
+            console.error('Error pushing to server:', error);
+            return false;
         }
     }
 
@@ -901,33 +1007,11 @@ class BookmarkManager {
     }
 
     async saveBookmarks() {
+        // Always persist to local storage (primary source of truth)
         try {
-            // Try to save to sync storage first (only if available), fallback to local storage
-            if (this.syncAvailable) {
-                try {
-                    // Check if bookmarks data is too large for sync storage
-                    const data = { bookmarks: this.bookmarks, folders: this.folders };
-                    const dataString = JSON.stringify(data);
-                    const sizeInBytes = new TextEncoder().encode(dataString).length;
-                    
-                    // Chrome sync storage limits: 8KB per item, 100KB total
-                    if (sizeInBytes > 8000) { // 8KB limit with some buffer
-                        console.log('Data too large for sync storage, using local storage');
-                        await chrome.storage.local.set(data);
-                    } else {
-                        await chrome.storage.sync.set(data);
-                        console.log('Saved bookmarks and folders to sync storage');
-                    }
-                } catch (syncError) {
-                    console.log('Sync storage failed, saving to local storage:', syncError.message);
-                    await chrome.storage.local.set({ bookmarks: this.bookmarks, folders: this.folders });
-                }
-            } else {
-                console.log('Sync not available, saving to local storage');
-                await chrome.storage.local.set({ bookmarks: this.bookmarks, folders: this.folders });
-            }
+            await chrome.storage.local.set({ bookmarks: this.bookmarks, folders: this.folders });
         } catch (error) {
-            console.error('Error saving bookmarks:', error);
+            console.error('Error saving bookmarks to local storage:', error);
         }
     }
 
@@ -1326,26 +1410,81 @@ class BookmarkManager {
 
         if (!title || !url) return;
 
+        const favicon = this.selectedFavicon || '';
+        const faviconWasSelected = !!this.selectedFavicon;
+
         const bookmark = {
             id: Date.now(),
             title,
             url,
-            favicon: this.selectedFavicon || '',
+            favicon,
             dateAdded: new Date().toISOString(),
-            folderId: null // null means it's not in a folder
+            folderId: null,
         };
 
-        // Check if a favicon was selected before hiding modal (which resets selectedFavicon)
-        const faviconWasSelected = !!this.selectedFavicon;
-        
         this.bookmarks.unshift(bookmark);
         await this.saveBookmarks();
         this.renderQuickAccess();
         this.hideAddBookmarkModal();
-        
+
         // Only update favicon async if no favicon was selected
         if (!faviconWasSelected) {
             this.updateFaviconAsync(bookmark.id, url);
+        }
+
+        // Sync to server in background
+        this._syncCreateBookmark(bookmark);
+    }
+
+    async _syncCreateBookmark(bookmark) {
+        if (!api.isAuthenticated()) return;
+        try {
+            const oldId = bookmark.id;
+            // Use the bookmark's index in the local array as its position
+            const idx = this.bookmarks.findIndex(b => b.id === oldId);
+            const position = idx !== -1 ? idx : 0;
+
+            const serverBookmark = await api.createBookmark({
+                title: bookmark.title,
+                url: bookmark.url,
+                favicon: bookmark.favicon || null,
+                folderId: bookmark.folderId,
+                position: position,
+            });
+            // Update local ID to match server-assigned ID
+            const currentIdx = this.bookmarks.findIndex(b => b.id === oldId);
+            if (currentIdx !== -1) {
+                this.bookmarks[currentIdx].id = serverBookmark.id;
+                // Also update currentBookmarkId if the edit modal is open for this bookmark
+                if (this.currentBookmarkId === oldId) {
+                    this.currentBookmarkId = serverBookmark.id;
+                }
+                if (this.duplicatedBookmarkId === oldId) {
+                    this.duplicatedBookmarkId = serverBookmark.id;
+                }
+                await this.saveBookmarks();
+            }
+            // Re-sync all positions so there are no conflicts
+            await this._syncAllPositions();
+        } catch (e) {
+            console.log('Background sync (create bookmark) failed:', e.message);
+        }
+    }
+
+    async _syncAllPositions() {
+        if (!api.isAuthenticated()) return;
+        try {
+            const items = this.bookmarks
+                .map((b, i) => ({ id: b.id, position: i }));
+            // Also include folders
+            const folderItems = this.folders
+                .map((f, i) => ({ id: f.id, position: i + this.bookmarks.length }));
+            const allItems = [...items, ...folderItems];
+            if (allItems.length > 0) {
+                await api.reorderItems(allItems);
+            }
+        } catch (e) {
+            console.log('Background sync (positions) failed:', e.message);
         }
     }
 
@@ -1597,6 +1736,16 @@ class BookmarkManager {
         // Save and re-render
         await this.saveBookmarks();
         this.renderQuickAccess();
+
+        // Sync positions to server in background
+        if (api.isAuthenticated()) {
+            const reorderItems = this.bookmarks
+                .filter(b => !b.folderId)
+                .map((b, i) => ({ id: b.id, position: i }));
+            api.reorderItems(reorderItems).catch(e =>
+                console.log('Background sync (reorder) failed:', e.message)
+            );
+        }
     }
 
     // Helper function to set appropriate z-index class based on open modals
@@ -1775,69 +1924,47 @@ class BookmarkManager {
     }
 
     async updateBookmark() {
-        console.log('updateBookmark called, currentBookmarkId:', this.currentBookmarkId);
-        
-        if (!this.currentBookmarkId) {
-            console.log('No currentBookmarkId, exiting');
-            return;
-        }
+        if (!this.currentBookmarkId) return;
         
         const title = document.getElementById('editBookmarkTitle').value.trim();
         const rawUrl = document.getElementById('editBookmarkUrl').value.trim();
         const url = this.normalizeUrl(rawUrl);
 
-        console.log('Form values:', { title, url });
-
-        if (!title || !url) {
-            console.log('Missing title or url, exiting');
-            return;
-        }
+        if (!title || !url) return;
 
         const bookmarkIndex = this.bookmarks.findIndex(b => b.id === this.currentBookmarkId);
-        console.log('Found bookmark at index:', bookmarkIndex);
-        
-        if (bookmarkIndex === -1) {
-            console.log('Bookmark not found, exiting');
-            return;
-        }
+        if (bookmarkIndex === -1) return;
 
         const oldUrl = this.bookmarks[bookmarkIndex].url;
+        const bookmarkId = this.currentBookmarkId;
 
-        console.log('Updating bookmark...');
-        
-        // Check if a favicon was selected, otherwise keep the existing one
-        const updatedBookmark = {
-            ...this.bookmarks[bookmarkIndex],
-            title,
-            url
-        };
-        
-        // If a favicon was selected in the edit form, use it
+        // Apply locally first
+        const updates = { title, url };
         if (this.selectedEditFavicon !== null) {
-            updatedBookmark.favicon = this.selectedEditFavicon;
+            updates.favicon = this.selectedEditFavicon;
         }
-        
-        this.bookmarks[bookmarkIndex] = updatedBookmark;
+        this.bookmarks[bookmarkIndex] = { ...this.bookmarks[bookmarkIndex], ...updates };
 
-        console.log('Saving bookmarks...');
         await this.saveBookmarks();
-        console.log('Rendering...');
         this.renderQuickAccess();
         
-        // If we're in a folder modal and the edited bookmark is in that folder, update the folder view
         const editedBookmark = this.bookmarks[bookmarkIndex];
         if (this.openFolderId && editedBookmark && editedBookmark.folderId === this.openFolderId) {
             this.renderFolderBookmarks(this.openFolderId);
         }
         
-        console.log('Hiding modal...');
         this.hideEditBookmarkModal();
         
-        // Only update favicon async if no favicon was manually selected and URL changed
         if (url !== oldUrl && this.selectedEditFavicon === null) {
-            this.updateFaviconAsync(this.currentBookmarkId, url);
+            this.updateFaviconAsync(bookmarkId, url);
         }
-        console.log('Update complete');
+
+        // Sync to server in background
+        if (api.isAuthenticated()) {
+            api.updateBookmark(bookmarkId, updates).catch(e =>
+                console.log('Background sync (update bookmark) failed:', e.message)
+            );
+        }
     }
 
     async duplicateBookmark() {
@@ -1850,13 +1977,16 @@ class BookmarkManager {
             ...bookmark,
             id: Date.now(),
             title: bookmark.title,
-            dateAdded: new Date().toISOString()
+            dateAdded: new Date().toISOString(),
         };
         
         const originalIndex = this.bookmarks.findIndex(b => b.id === this.currentBookmarkId);
         this.bookmarks.splice(originalIndex + 1, 0, duplicatedBookmark);
         await this.saveBookmarks();
         this.renderQuickAccess();
+
+        // Sync to server in background
+        this._syncCreateBookmark(duplicatedBookmark);
         
         // If we're in a folder modal, also update the folder view
         if (this.openFolderId && bookmark.folderId === this.openFolderId) {
@@ -1942,6 +2072,14 @@ class BookmarkManager {
             if (bookmarkIndex !== -1 && faviconUrl) {
                 this.bookmarks[bookmarkIndex].favicon = faviconUrl;
                 await this.saveBookmarks();
+                // Also update on server
+                if (api.isAuthenticated()) {
+                    try {
+                        await api.updateBookmark(bookmarkId, { favicon: faviconUrl });
+                    } catch (e) {
+                        console.log('Failed to update favicon on server:', e.message);
+                    }
+                }
                 
                 const bookmarkElement = document.querySelector(`[data-bookmark-id="${bookmarkId}"]`);
                 if (bookmarkElement) {
@@ -2034,45 +2172,55 @@ class BookmarkManager {
             // Delete bookmark
             this.removeDeleteHighlight();
             
-            // Get the bookmark before deleting to check if it was in a folder
             const deletedBookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
+            const deletedId = this.currentBookmarkId;
             
             this.bookmarks = this.bookmarks.filter(b => b.id !== this.currentBookmarkId);
             await this.saveBookmarks();
             this.renderQuickAccess();
-            
-            // Clean up unused favicons after deletion
             await this.cleanupUnusedFavicons();
             
-            // If we're in a folder modal and the deleted bookmark was in that folder, update the folder view
             if (this.openFolderId && deletedBookmark && deletedBookmark.folderId === this.openFolderId) {
                 this.renderFolderBookmarks(this.openFolderId);
             }
             
             this.currentBookmarkId = null;
+
+            // Sync to server in background
+            if (api.isAuthenticated()) {
+                api.deleteBookmark(deletedId).catch(e =>
+                    console.log('Background sync (delete bookmark) failed:', e.message)
+                );
+            }
         } else if (this.currentFolderId) {
             // Delete folder
             this.removeFolderDeleteHighlight();
             
+            const deletedFolderId = this.currentFolderId;
+            
             // Move all bookmarks in this folder back to main view
             this.bookmarks.forEach(bookmark => {
                 if (bookmark.folderId === this.currentFolderId) {
-                    bookmark.folderId = null; // Remove from folder
+                    bookmark.folderId = null;
                 }
             });
             
-            // Close folder modal if this folder was open
             if (this.openFolderId === this.currentFolderId) {
                 this.closeFolderModal();
             }
             
-            // Remove the folder
             this.folders = this.folders.filter(f => f.id !== this.currentFolderId);
             
-            // Save changes and update UI
             await this.saveBookmarks();
             this.renderQuickAccess();
             this.currentFolderId = null;
+
+            // Sync to server in background
+            if (api.isAuthenticated()) {
+                api.deleteFolder(deletedFolderId).catch(e =>
+                    console.log('Background sync (delete folder) failed:', e.message)
+                );
+            }
         }
     }
 
@@ -2092,6 +2240,13 @@ class BookmarkManager {
         this.bookmarks = this.bookmarks.filter(b => b.id !== bookmarkId);
         await this.saveBookmarks();
         await this.cleanupUnusedFavicons();
+
+        // Sync to server in background
+        if (api.isAuthenticated()) {
+            api.deleteBookmark(bookmarkId).catch(e =>
+                console.log('Background sync (delete by id) failed:', e.message)
+            );
+        }
     }
 
     // Bookmark highlighting methods
@@ -2199,8 +2354,8 @@ class BookmarkManager {
         // Load current settings into the modal
         this.loadCurrentSettingsIntoForm();
         
-        // Update sync status in settings modal
-        this.updateSettingsSyncStatus();
+        // Update auth UI and sync buttons visibility
+        this.updateAuthUI();
         
         // Position modal at bottom right with specific margins
         modal.classList.remove('hidden');
@@ -2237,13 +2392,20 @@ class BookmarkManager {
     }
 
     async saveSettings() {
-        // Save current settings to storage
+        // Save to local storage first
         await this.saveSettingsToStorage();
+
+        // Sync to server in background
+        if (api.isAuthenticated()) {
+            api.patchSettings(this.settings).catch(e =>
+                console.log('Background sync (settings) failed:', e.message)
+            );
+        }
     }
 
     async exportAllData() {
         try {
-            // Gather all data from storage
+            // Gather all data from local storage
             const data = {
                 bookmarks: this.bookmarks,
                 folders: this.folders,
@@ -2428,6 +2590,9 @@ class BookmarkManager {
             // Show success notification
             this.showImportNotification();
             console.log('Import completed successfully');
+
+            // Push imported data to server in background
+            this.pushToServer();
         } catch (error) {
             console.error('Import failed:', error);
             alert(`Import failed: ${error.message}`);
@@ -2540,23 +2705,7 @@ class BookmarkManager {
 
 
 
-    updateSettingsSyncStatus() {
-        const statusContainer = document.getElementById('settingsSyncStatus');
-        const statusIcon = document.getElementById('settingsSyncIcon');
-        const statusText = document.getElementById('settingsSyncText');
-        
-        if (this.syncAvailable) {
-            statusIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>';
-            statusIcon.setAttribute('class', 'w-4 h-4 text-green-500');
-            statusText.textContent = 'Sync enabled and working';
-            statusContainer.className = 'flex items-center space-x-2 p-3 bg-green-50 border border-green-200 rounded-lg';
-        } else {
-            statusIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>';
-            statusIcon.setAttribute('class', 'w-4 h-4 text-yellow-500');
-            statusText.textContent = 'Sync not available';
-            statusContainer.className = 'flex items-center space-x-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg';
-        }
-    }
+    
 
     // Folder management methods
     openFolder(folderId) {
@@ -2684,6 +2833,13 @@ class BookmarkManager {
         bookmark.folderId = folderId;
         await this.saveBookmarks();
         this.renderQuickAccess();
+
+        // Sync to server in background
+        if (api.isAuthenticated()) {
+            api.updateBookmark(bookmarkId, { folderId }).catch(e =>
+                console.log('Background sync (move to folder) failed:', e.message)
+            );
+        }
     }
 
     async createFolder(name) {
@@ -2696,6 +2852,20 @@ class BookmarkManager {
         this.folders.push(folder);
         await this.saveBookmarks();
         this.renderQuickAccess();
+
+        // Sync to server in background
+        if (api.isAuthenticated()) {
+            api.createFolder({ name }).then(serverFolder => {
+                // Update local ID to match server-assigned ID
+                const idx = this.folders.findIndex(f => f.id === folder.id);
+                if (idx !== -1) {
+                    this.folders[idx].id = serverFolder.id;
+                    this.saveBookmarks();
+                }
+            }).catch(e =>
+                console.log('Background sync (create folder) failed:', e.message)
+            );
+        }
         
         return folder;
     }
@@ -2775,6 +2945,7 @@ class BookmarkManager {
         const folder = this.folders.find(f => f.id === this.currentFolderId);
         if (!folder) return;
         
+        const folderId = this.currentFolderId;
         folder.name = newName;
         await this.saveBookmarks();
         this.renderQuickAccess();
@@ -2786,6 +2957,13 @@ class BookmarkManager {
         
         this.hideRenameFolderModal();
         this.currentFolderId = null;
+
+        // Sync to server in background
+        if (api.isAuthenticated()) {
+            api.updateFolder(folderId, { name: newName }).catch(e =>
+                console.log('Background sync (rename folder) failed:', e.message)
+            );
+        }
     }
 
     async deleteFolderWithBookmarks() {
@@ -2794,6 +2972,8 @@ class BookmarkManager {
         const folder = this.folders.find(f => f.id === this.currentFolderId);
         if (!folder) return;
         
+        const deletedFolderId = this.currentFolderId;
+
         // Move all bookmarks in this folder back to main view
         this.bookmarks.forEach(bookmark => {
             if (bookmark.folderId === this.currentFolderId) {
@@ -2814,6 +2994,13 @@ class BookmarkManager {
         }
         
         this.currentFolderId = null;
+
+        // Sync to server in background
+        if (api.isAuthenticated()) {
+            api.deleteFolder(deletedFolderId).catch(e =>
+                console.log('Background sync (delete folder) failed:', e.message)
+            );
+        }
     }
 
     showFolderDeleteConfirmation(event) {
@@ -2997,6 +3184,13 @@ class BookmarkManager {
         // Re-render both the folder contents and main view
         this.renderFolderBookmarks(this.openFolderId);
         this.renderQuickAccess();
+
+        // Sync to server in background
+        if (api.isAuthenticated()) {
+            api.updateBookmark(bookmarkId, { folderId: null }).catch(e =>
+                console.log('Background sync (remove from folder) failed:', e.message)
+            );
+        }
     }
 
     // Removed unused bookmark card and list rendering methods

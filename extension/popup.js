@@ -5,33 +5,13 @@ class QuiClickPopup {
     constructor() {
         this.selectedFavicon = null;
         this.faviconDebounceTimer = null;
-        this.syncAvailable = false;
         this.init();
     }
 
     async init() {
-        await this.checkSyncAvailability();
+        await api.checkAuth();
         await this.loadCurrentTab();
         this.setupEventListeners();
-    }
-
-    async checkSyncAvailability() {
-        try {
-            const testKey = 'syncTest_' + Date.now();
-            const testValue = 'test';
-            
-            await chrome.storage.sync.set({ [testKey]: testValue });
-            const result = await chrome.storage.sync.get([testKey]);
-            await chrome.storage.sync.remove([testKey]);
-            
-            if (result[testKey] === testValue) {
-                this.syncAvailable = true;
-            } else {
-                throw new Error('Sync test failed');
-            }
-        } catch (error) {
-            this.syncAvailable = false;
-        }
     }
 
     async loadCurrentTab() {
@@ -236,7 +216,7 @@ class QuiClickPopup {
             document.getElementById('addBtn').disabled = true;
             document.getElementById('addBtn').textContent = 'Adding...';
 
-            // Get current bookmarks and folders
+            // Get current bookmarks and folders from local storage
             const { bookmarks, folders } = await this.loadBookmarks();
             
             // Check if bookmark already exists
@@ -269,8 +249,18 @@ class QuiClickPopup {
             // Add bookmark to array
             bookmarks.push(newBookmark);
 
-            // Save updated bookmarks
+            // Save to local storage
             await this.saveBookmarks(bookmarks, folders);
+
+            // Sync to server in background
+            if (api.isAuthenticated()) {
+                api.createBookmark({
+                    title: newBookmark.title,
+                    url: newBookmark.url,
+                    favicon: newBookmark.favicon || null,
+                    folderId: null,
+                }).catch(e => console.log('Background sync (popup create) failed:', e.message));
+            }
 
             // Show success and close popup
             document.getElementById('addBtn').textContent = 'Added!';
@@ -288,66 +278,20 @@ class QuiClickPopup {
 
     async loadBookmarks() {
         try {
-            let result;
-            let syncResult = null;
-            let localResult = null;
-            
-            if (this.syncAvailable) {
-                try {
-                    syncResult = await chrome.storage.sync.get(['bookmarks', 'folders']);
-                } catch (syncError) {
-                    console.log('Sync storage error:', syncError.message);
-                }
-            }
-            
-            try {
-                localResult = await chrome.storage.local.get(['bookmarks', 'folders']);
-            } catch (localError) {
-                console.log('Local storage error:', localError.message);
-            }
-            
-            // Determine which storage has the most recent data
-            if (localResult && localResult.bookmarks && localResult.bookmarks.length > 0) {
-                result = localResult;
-            } else if (syncResult && syncResult.bookmarks && syncResult.bookmarks.length > 0) {
-                result = syncResult;
-            } else {
-                result = {};
-            }
-            
+            const result = await chrome.storage.local.get(['bookmarks', 'folders']);
             return {
                 bookmarks: result.bookmarks || [],
                 folders: result.folders || []
             };
-            
         } catch (error) {
             console.log('Error loading bookmarks:', error);
-            return {
-                bookmarks: [],
-                folders: []
-            };
+            return { bookmarks: [], folders: [] };
         }
     }
 
     async saveBookmarks(bookmarks, folders) {
         try {
-            if (this.syncAvailable) {
-                try {
-                    const data = { bookmarks, folders };
-                    const dataString = JSON.stringify(data);
-                    const sizeInBytes = new TextEncoder().encode(dataString).length;
-                    
-                    if (sizeInBytes > 8000) {
-                        await chrome.storage.local.set(data);
-                    } else {
-                        await chrome.storage.sync.set(data);
-                    }
-                } catch (syncError) {
-                    await chrome.storage.local.set({ bookmarks, folders });
-                }
-            } else {
-                await chrome.storage.local.set({ bookmarks, folders });
-            }
+            await chrome.storage.local.set({ bookmarks, folders });
         } catch (error) {
             console.error('Error saving bookmarks:', error);
             throw error;

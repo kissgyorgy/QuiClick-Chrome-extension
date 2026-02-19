@@ -13,7 +13,8 @@
     "tabs"
   ],
   "host_permissions": [
-    "https://*/*"
+    "https://*/*",
+    "https://local.fancyauth.com:8000/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
