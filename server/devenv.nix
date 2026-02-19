@@ -1,9 +1,14 @@
-{ ... }:
+{ lib, ... }:
 
 {
   # https://devenv.sh/basics/
   env = {
-    FLASK_APP = "quiclick_server.app:app";
+    # define it in devenv.local.nix
+    # QUICLICK_GOOGLE_CLIENT_ID = "your-google-client-id";
+    # QUICLICK_GOOGLE_CLIENT_SECRET = "your-google-client-secret";
+    QUICLICK_SECRET_KEY = "change-me-to-a-random-secret";
+    QUICLICK_SERVER_HOST = "https://local.fancyauth.com:8000";
+    QUICLICK_DATA_DIR = "data";
   };
 
   # https://devenv.sh/packages/
@@ -24,7 +29,7 @@
   };
 
   # https://devenv.sh/processes/
-  # processes.cargo-watch.exec = "cargo-watch";
+  processes.server.exec = "uvicorn quiclick_server.main:app --ssl-certfile ./nogit/local.fancyauth.com.pem --ssl-keyfile ./nogit/local.fancyauth.com-key.pem --reload --host 127.0.0.1 --port 8000";
 
   # https://devenv.sh/services/
 
