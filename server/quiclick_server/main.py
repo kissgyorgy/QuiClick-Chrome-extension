@@ -31,7 +31,7 @@ app.add_middleware(
 # CORS — allow the Chrome extension to send credentials
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: restrict to chrome-extension://<id>
+    allow_origins=[o.strip() for o in cfg.cors_origins.split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["Content-Type"],

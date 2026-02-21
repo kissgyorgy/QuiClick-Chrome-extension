@@ -7,6 +7,7 @@ class AppConfig:
     google_client_secret: str = environ.var()
     secret_key: str = environ.var()
     server_host: str = environ.var("http://localhost:8000")
+    cors_origins: str = environ.var("chrome-extension://fcemlekbbpkogapcgibnfnneknolknib")
     data_dir: str = environ.var("data")
 
 

@@ -1,6 +1,8 @@
+import httpx
 from authlib.integrations.starlette_client import OAuth
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from quiclick_server.config import cfg
@@ -75,6 +77,52 @@ async def success():
     </body>
     </html>
     """
+
+
+class TokenRequest(BaseModel):
+    token: str
+
+
+@router.post("/token", response_model=UserResponse)
+async def exchange_token(body: TokenRequest, request: Request):
+    """Exchange a Google access token (from chrome.identity) for a session cookie."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {body.token}"},
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+
+    userinfo = resp.json()
+    sub = userinfo.get("sub")
+    if not sub:
+        raise HTTPException(status_code=401, detail="Token missing sub claim")
+
+    email = userinfo.get("email", "")
+    name = userinfo.get("name")
+
+    # Upsert user in the shared users.db
+    engine = get_users_engine()
+    try:
+        with Session(engine) as session:
+            user = session.get(UserRecord, sub)
+            if user:
+                user.email = email
+                user.name = name
+            else:
+                user = UserRecord(sub=sub, email=email, name=name)
+                session.add(user)
+            session.commit()
+    finally:
+        engine.dispose()
+
+    # Set session cookie
+    request.session["sub"] = sub
+    request.session["email"] = email
+    request.session["name"] = name
+
+    return UserResponse(sub=sub, email=email, name=name)
 
 
 @router.post("/logout")
