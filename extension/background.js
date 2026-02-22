@@ -25,14 +25,23 @@ chrome.runtime.onStartup.addListener(() => {
 init();
 
 async function init() {
-  try {
-    await pullChanges();
-  } catch (e) {
-    console.warn("QuiClick: init pull failed:", e.message);
-  }
-  // Process any pending queue items
+  // Process any pending queue items (but don't pull — pull is triggered by new tab open)
   processQueue();
 }
+
+// ─── Message listener (new tab triggers pull) ──────────────────────────────
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "pull_changes") {
+    pullChanges()
+      .then(() => sendResponse({ ok: true }))
+      .catch((e) => {
+        console.warn("QuiClick: pull from new tab failed:", e.message);
+        sendResponse({ ok: false, error: e.message });
+      });
+    return true; // keep message channel open for async response
+  }
+});
 
 // ─── Storage change listener ───────────────────────────────────────────────
 

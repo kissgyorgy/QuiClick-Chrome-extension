@@ -35,6 +35,11 @@ class BookmarkManager {
     this.renderQuickAccess();
 
     await this.cleanupUnusedFavicons();
+
+    // Trigger a server sync via the background worker on every new tab open
+    chrome.runtime.sendMessage({ type: "pull_changes" }).catch(() => {
+      // Background worker may not be ready yet — that's fine
+    });
   }
 
   async checkAuth() {
