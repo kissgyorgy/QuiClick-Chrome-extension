@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }:
+{ pkgs, ... }:
 
 {
   env = {
@@ -8,9 +8,14 @@
     QUICLICK_SECRET_KEY = "change-me-to-a-random-secret";
     QUICLICK_SERVER_HOST = "https://local.fancyauth.com:8000";
     QUICLICK_DATA_DIR = "data";
+    PLAYWRIGHT_MCP_EXECUTABLE_PATH = "${pkgs.chromium}/bin/chromium";
+    PLAYWRIGHT_MCP_BROWSER = "chromium";
   };
 
-  packages = [ pkgs.just ];
+  packages = with pkgs; [
+    just
+    chromium
+  ];
 
   languages.python = {
     enable = true;

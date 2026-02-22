@@ -26,8 +26,18 @@ def _bookmark_favicon_data_url(bm: Bookmark) -> str | None:
 @router.get("/export", response_model=ExportData)
 def export_data(db: Session = Depends(get_db)):
     """Export all user data as JSON."""
-    bookmarks = db.query(Bookmark).order_by(Bookmark.position).all()
-    folders = db.query(Folder).order_by(Folder.position).all()
+    bookmarks = (
+        db.query(Bookmark)
+        .filter(Bookmark.deleted_at.is_(None))
+        .order_by(Bookmark.position)
+        .all()
+    )
+    folders = (
+        db.query(Folder)
+        .filter(Folder.deleted_at.is_(None))
+        .order_by(Folder.position)
+        .all()
+    )
     settings = db.get(Settings, 1)
 
     export_bookmarks = [

@@ -119,6 +119,8 @@ class BookmarkResponse(BaseModel):
     date_added: datetime
     parent_id: int | None
     position: float
+    last_updated: datetime | None = None
+    deleted_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -144,6 +146,8 @@ class FolderResponse(BaseModel):
     date_added: datetime
     parent_id: int | None
     position: float
+    last_updated: datetime | None = None
+    deleted_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -221,3 +225,20 @@ class UserResponse(BaseModel):
     sub: str
     email: str
     name: str | None
+
+
+# --- Changes (delta sync) schemas ---
+
+
+class SettingsWithTimestamp(SettingsResponse):
+    last_updated: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ChangesResponse(BaseModel):
+    user: UserResponse
+    bookmarks: list[BookmarkResponse]
+    folders: list[FolderResponse]
+    settings: SettingsWithTimestamp | None
+    deleted_ids: list[int]

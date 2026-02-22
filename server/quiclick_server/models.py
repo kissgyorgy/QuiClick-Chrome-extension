@@ -31,6 +31,13 @@ class Item(Base):
     )
     parent_id = Column(Integer, ForeignKey("items.id"), nullable=True)
     position = Column(Float, nullable=False)
+    last_updated = Column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    deleted_at = Column(DateTime, nullable=True, default=None)
 
     children = relationship("Item", backref="parent", remote_side=[id])
 
@@ -74,6 +81,12 @@ class Settings(Base):
     tiles_per_row = Column(Integer, nullable=False, default=8)
     tile_gap = Column(Integer, nullable=False, default=1)
     show_add_button = Column(Boolean, nullable=False, default=True)
+    last_updated = Column(
+        DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
 
 # --- User registry model (stored in users.db) ---

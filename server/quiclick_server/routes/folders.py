@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -24,21 +26,30 @@ def _folder_to_response(folder: Folder) -> FolderResponse:
         date_added=folder.date_added,
         parent_id=folder.parent_id,
         position=folder.position,
+        last_updated=folder.last_updated,
+        deleted_at=folder.deleted_at,
     )
 
 
 def _next_root_position(db: Session) -> float:
     """Get the next position value for root-level items (shared space)."""
-    max_pos = db.query(func.max(Item.position)).filter(
-        Item.parent_id.is_(None)
-    ).scalar()
+    max_pos = (
+        db.query(func.max(Item.position))
+        .filter(Item.parent_id.is_(None), Item.deleted_at.is_(None))
+        .scalar()
+    )
     return (max_pos or 0.0) + 1.0
 
 
 @router.get("", response_model=list[FolderResponse])
 def list_folders(db: Session = Depends(get_db)):
     """List all folders, ordered by position."""
-    folders = db.query(Folder).order_by(Folder.position).all()
+    folders = (
+        db.query(Folder)
+        .filter(Folder.deleted_at.is_(None))
+        .order_by(Folder.position)
+        .all()
+    )
     return [_folder_to_response(f) for f in folders]
 
 
@@ -66,12 +77,12 @@ def create_folder(body: FolderCreate, db: Session = Depends(get_db)):
 def get_folder(folder_id: int, db: Session = Depends(get_db)):
     """Get a folder and its child bookmarks."""
     folder = db.get(Folder, folder_id)
-    if not folder:
+    if not folder or folder.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Folder not found")
 
     bookmarks = (
         db.query(Bookmark)
-        .filter(Bookmark.parent_id == folder_id)
+        .filter(Bookmark.parent_id == folder_id, Bookmark.deleted_at.is_(None))
         .order_by(Bookmark.position)
         .all()
     )
@@ -96,7 +107,7 @@ def update_folder(
 ):
     """Full update of a folder (rename and/or reposition)."""
     folder = db.get(Folder, folder_id)
-    if not folder:
+    if not folder or folder.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Folder not found")
 
     folder.title = body.title
@@ -114,19 +125,26 @@ def update_folder(
 
 @router.delete("/{folder_id}", status_code=204)
 def delete_folder(folder_id: int, db: Session = Depends(get_db)):
-    """Delete a folder. Orphaned bookmarks are moved to root (parent_id=None)."""
+    """Soft-delete a folder. Orphaned bookmarks are moved to root (parent_id=None)."""
     folder = db.get(Folder, folder_id)
-    if not folder:
+    if not folder or folder.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Folder not found")
+
+    now = datetime.now(timezone.utc)
 
     # Move child bookmarks to root level
     children = (
-        db.query(Bookmark).filter(Bookmark.parent_id == folder_id).all()
+        db.query(Bookmark)
+        .filter(Bookmark.parent_id == folder_id, Bookmark.deleted_at.is_(None))
+        .all()
     )
     for child in children:
         child.parent_id = None
+        child.last_updated = now
 
-    db.delete(folder)
+    # Soft-delete the folder
+    folder.deleted_at = now
+    folder.last_updated = now
     try:
         db.commit()
     except IntegrityError:

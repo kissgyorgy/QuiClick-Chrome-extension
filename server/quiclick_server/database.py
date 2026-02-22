@@ -48,6 +48,39 @@ def get_current_user(request: Request) -> str:
 # --- Per-user DB dependency ---
 
 
+def _migrate_user_db(engine):
+    """Add new columns to existing user databases if missing."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+
+    # Migrate items table
+    if inspector.has_table("items"):
+        existing = {col["name"] for col in inspector.get_columns("items")}
+        with engine.begin() as conn:
+            if "last_updated" not in existing:
+                conn.execute(
+                    text(
+                        "ALTER TABLE items ADD COLUMN last_updated DATETIME "
+                        "NOT NULL DEFAULT '2025-01-01T00:00:00'"
+                    )
+                )
+            if "deleted_at" not in existing:
+                conn.execute(text("ALTER TABLE items ADD COLUMN deleted_at DATETIME"))
+
+    # Migrate settings table
+    if inspector.has_table("settings"):
+        existing = {col["name"] for col in inspector.get_columns("settings")}
+        with engine.begin() as conn:
+            if "last_updated" not in existing:
+                conn.execute(
+                    text(
+                        "ALTER TABLE settings ADD COLUMN last_updated DATETIME "
+                        "NOT NULL DEFAULT '2025-01-01T00:00:00'"
+                    )
+                )
+
+
 def get_db(sub: str = Depends(get_current_user)) -> Generator[Session, None, None]:
     """Yield a SQLAlchemy Session for the authenticated user's personal DB."""
     from quiclick_server.models import Base as UserBase
@@ -62,6 +95,8 @@ def get_db(sub: str = Depends(get_current_user)) -> Generator[Session, None, Non
     try:
         if first_time:
             UserBase.metadata.create_all(engine)
+        else:
+            _migrate_user_db(engine)
         with Session(engine) as session:
             yield session
     finally:

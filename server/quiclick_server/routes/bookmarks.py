@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
@@ -45,14 +46,18 @@ def _bookmark_to_response(bookmark: Bookmark) -> BookmarkResponse:
         date_added=bookmark.date_added,
         parent_id=bookmark.parent_id,
         position=bookmark.position,
+        last_updated=bookmark.last_updated,
+        deleted_at=bookmark.deleted_at,
     )
 
 
 def _next_position(db: Session, parent_id: int | None) -> float:
     """Get the next position value for items in the given scope."""
-    max_pos = db.query(func.max(Item.position)).filter(
-        Item.parent_id == parent_id
-    ).scalar()
+    max_pos = (
+        db.query(func.max(Item.position))
+        .filter(Item.parent_id == parent_id, Item.deleted_at.is_(None))
+        .scalar()
+    )
     return (max_pos or 0.0) + 1.0
 
 
@@ -62,7 +67,7 @@ def list_bookmarks(
     db: Session = Depends(get_db),
 ):
     """List bookmarks. Optional ?folder_id= filter. Use folder_id=root for root level."""
-    query = db.query(Bookmark)
+    query = db.query(Bookmark).filter(Bookmark.deleted_at.is_(None))
     if folder_id is not None:
         if folder_id == "root":
             query = query.filter(Bookmark.parent_id.is_(None))
@@ -70,7 +75,9 @@ def list_bookmarks(
             try:
                 fid = int(folder_id)
             except ValueError:
-                raise HTTPException(status_code=422, detail="folder_id must be an integer or 'root'")
+                raise HTTPException(
+                    status_code=422, detail="folder_id must be an integer or 'root'"
+                )
             query = query.filter(Bookmark.parent_id == fid)
     bookmarks = query.order_by(Bookmark.position).all()
     return [_bookmark_to_response(b) for b in bookmarks]
@@ -82,7 +89,11 @@ def create_bookmark(
     db: Session = Depends(get_db),
 ):
     """Create a new bookmark."""
-    position = body.position if body.position is not None else _next_position(db, body.parent_id)
+    position = (
+        body.position
+        if body.position is not None
+        else _next_position(db, body.parent_id)
+    )
 
     favicon_bytes = None
     favicon_mime = None
@@ -114,7 +125,7 @@ def get_bookmark(
 ):
     """Get a single bookmark by ID."""
     bookmark = db.get(Bookmark, bookmark_id)
-    if not bookmark:
+    if not bookmark or bookmark.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Bookmark not found")
     return _bookmark_to_response(bookmark)
 
@@ -127,7 +138,7 @@ def update_bookmark_full(
 ):
     """Full update of a bookmark."""
     bookmark = db.get(Bookmark, bookmark_id)
-    if not bookmark:
+    if not bookmark or bookmark.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Bookmark not found")
 
     bookmark.title = body.title
@@ -161,7 +172,7 @@ def update_bookmark_partial(
 ):
     """Partial update of a bookmark."""
     bookmark = db.get(Bookmark, bookmark_id)
-    if not bookmark:
+    if not bookmark or bookmark.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Bookmark not found")
 
     if body.title is not None:
@@ -191,11 +202,13 @@ def delete_bookmark(
     bookmark_id: int,
     db: Session = Depends(get_db),
 ):
-    """Delete a bookmark."""
+    """Soft-delete a bookmark (set deleted_at instead of removing)."""
     bookmark = db.get(Bookmark, bookmark_id)
-    if not bookmark:
+    if not bookmark or bookmark.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Bookmark not found")
-    db.delete(bookmark)
+    now = datetime.now(timezone.utc)
+    bookmark.deleted_at = now
+    bookmark.last_updated = now
     db.commit()
 
 
@@ -208,9 +221,7 @@ def reorder_bookmarks(
     for item in body.items:
         bookmark = db.get(Bookmark, item.id)
         if not bookmark:
-            raise HTTPException(
-                status_code=404, detail=f"Bookmark {item.id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Bookmark {item.id} not found")
         bookmark.position = item.position
 
     try:

@@ -1,1509 +1,1523 @@
 class BookmarkManager {
-    constructor() {
-        this.bookmarks = [];
-        this.folders = [];
-        this.currentBookmarkId = null;
-        this.currentFolderId = null;
-        this.openFolderId = null;
-        this.isDragging = false;
-        this.draggedBookmarkId = null;
-        this.draggedFolderId = null;
-        this.isDuplicateMode = false;
-        this.duplicatedBookmarkId = null;
-        this.selectedFavicon = null;
-        this.selectedEditFavicon = null;
-        this.faviconDebounceTimer = null;
-        this.editFaviconDebounceTimer = null;
-        this.syncAvailable = false;
-        this.settings = {
-            showTitles: true,
-            tilesPerRow: 8,
-            tileGap: 1,
-            showAddButton: true
+  constructor() {
+    this.bookmarks = [];
+    this.folders = [];
+    this.currentBookmarkId = null;
+    this.currentFolderId = null;
+    this.openFolderId = null;
+    this.isDragging = false;
+    this.draggedBookmarkId = null;
+    this.draggedFolderId = null;
+    this.isDuplicateMode = false;
+    this.duplicatedBookmarkId = null;
+    this.selectedFavicon = null;
+    this.selectedEditFavicon = null;
+    this.faviconDebounceTimer = null;
+    this.editFaviconDebounceTimer = null;
+    this.settings = {
+      showTitles: true,
+      tilesPerRow: 8,
+      tileGap: 1,
+      showAddButton: true,
+    };
+    this.init();
+  }
+
+  async init() {
+    await this.checkAuth();
+    await this.loadSettings();
+    await this.loadBookmarks();
+
+    this.setupEventListeners();
+    this.setupAuthListeners();
+    this.setupStorageListener();
+    this.updateTilesPerRowCSS(this.settings.tilesPerRow);
+    this.renderQuickAccess();
+
+    await this.cleanupUnusedFavicons();
+  }
+
+  async checkAuth() {
+    try {
+      const { authState } = await chrome.storage.local.get("authState");
+      this.authState = authState || { authenticated: false, user: null };
+      if (this.authState.authenticated) {
+        console.log("✅ Authenticated as:", this.authState.user?.email);
+      } else {
+        console.log("ℹ️ Not signed in — using local storage");
+      }
+    } catch (error) {
+      this.authState = { authenticated: false, user: null };
+      console.log("ℹ️ Could not read auth state:", error.message);
+    }
+    this.updateAuthUI();
+  }
+
+  updateAuthUI() {
+    const loginBtn = document.getElementById("loginBtn");
+    const userInfo = document.getElementById("userInfo");
+    const userName = document.getElementById("userName");
+
+    if (this.authState?.authenticated && this.authState?.user) {
+      loginBtn.classList.add("hidden");
+      userInfo.classList.remove("hidden");
+      userInfo.style.display = "flex";
+      userName.textContent =
+        this.authState.user.name || this.authState.user.email;
+    } else {
+      loginBtn.classList.remove("hidden");
+      loginBtn.style.display = "flex";
+      userInfo.classList.add("hidden");
+    }
+  }
+
+  setupAuthListeners() {
+    document.getElementById("loginBtn").addEventListener("click", () => {
+      const loginUrl = `${SYNC_API_BASE_URL}/auth/login`;
+      window.open(loginUrl, "_blank", "width=500,height=600");
+      // Signal background worker to poll for auth
+      chrome.storage.local.set({ authAction: "login_started" });
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      // Signal background worker to handle logout
+      await chrome.storage.local.set({ authAction: "logout" });
+    });
+  }
+
+  setupStorageListener() {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== "local") return;
+
+      // Auth state changed (written by background worker)
+      if (changes.authState) {
+        this.authState = changes.authState.newValue || {
+          authenticated: false,
+          user: null,
         };
-        this.init();
-    }
-
-    async init() {
-        await this.checkAuth();
-        await this.loadSettings();
-        await this.loadBookmarks(); // Now loads both bookmarks and folders
-
-        // If local storage is empty and user is authenticated, pull from server
-        const hasLocalData = this.bookmarks.length > 0 || this.folders.length > 0;
-        if (!hasLocalData && api.isAuthenticated()) {
-            console.log('No local data found, pulling from server...');
-            await this.pullFromServer();
-        }
-
-        this.setupEventListeners();
-        this.setupAuthListeners();
-        this.updateTilesPerRowCSS(this.settings.tilesPerRow);
-        this.renderQuickAccess();
-        
-        // Clean up unused favicons on startup (only when using local storage)
-        if (!api.isAuthenticated()) {
-            await this.cleanupUnusedFavicons();
-        }
-    }
-
-    async checkAuth() {
-        try {
-            const user = await api.checkAuth();
-            if (user) {
-                this.syncAvailable = true;
-                console.log('✅ Authenticated as:', user.email);
-            } else {
-                this.syncAvailable = false;
-                console.log('ℹ️ Not signed in — using local storage');
-            }
-        } catch (error) {
-            this.syncAvailable = false;
-            console.log('ℹ️ Server not available — using local storage');
-        }
         this.updateAuthUI();
-    }
-
-    updateAuthUI() {
-        const loginBtn = document.getElementById('loginBtn');
-        const userInfo = document.getElementById('userInfo');
-        const userName = document.getElementById('userName');
-        const syncButtons = document.getElementById('syncButtons');
-
-        if (api.isAuthenticated() && api.user) {
-            loginBtn.classList.add('hidden');
-            userInfo.classList.remove('hidden');
-            userInfo.style.display = 'flex';
-            userName.textContent = api.user.name || api.user.email;
-            syncButtons.classList.remove('hidden');
-        } else {
-            loginBtn.classList.remove('hidden');
-            loginBtn.style.display = 'flex';
-            userInfo.classList.add('hidden');
-            syncButtons.classList.add('hidden');
-        }
-    }
-
-    setupAuthListeners() {
-        document.getElementById('loginBtn').addEventListener('click', () => {
-            window.open(api.getLoginUrl(), '_blank', 'width=500,height=600');
-            // Poll for auth completion
-            const pollInterval = setInterval(async () => {
-                const user = await api.checkAuth();
-                if (user) {
-                    clearInterval(pollInterval);
-                    this.syncAvailable = true;
-                    this.updateAuthUI();
-                    // Reload data from server
-                    await this.loadSettings();
-                    await this.loadBookmarks();
-                    this.updateTilesPerRowCSS(this.settings.tilesPerRow);
-                    this.renderQuickAccess();
-                }
-            }, 1000);
-            // Stop polling after 5 minutes
-            setTimeout(() => clearInterval(pollInterval), 300000);
-        });
-
-        document.getElementById('logoutBtn').addEventListener('click', async () => {
-            await api.logout();
-            this.syncAvailable = false;
-            this.updateAuthUI();
-            // Reload from local storage
-            await this.loadSettings();
-            await this.loadBookmarks();
-            this.updateTilesPerRowCSS(this.settings.tilesPerRow);
-            this.renderQuickAccess();
-        });
-    }
-
-
-    setupEventListeners() {
-        // Add bookmark button
-        document.getElementById('addBookmarkBtn').addEventListener('click', () => {
-            this.showAddBookmarkModal();
-        });
-
-        // Export button
-        document.getElementById('exportBtn').addEventListener('click', () => {
-            this.exportAllData();
-        });
-
-        // Import button
-        document.getElementById('importBtn').addEventListener('click', () => {
-            this.importAllData();
-        });
-
-        // Import modal buttons
-        document.getElementById('confirmImportBtn').addEventListener('click', () => {
-            this.confirmImport();
-        });
-
-        document.getElementById('cancelImportBtn').addEventListener('click', () => {
-            this.hideImportConfirmModal();
-        });
-
-        // Import modal backdrop click
-        document.getElementById('importConfirmModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                this.hideImportConfirmModal();
-            }
-        });
-
-        // Create folder button
-        document.getElementById('createFolderBtn').addEventListener('click', () => {
-            this.showCreateFolderModal();
-        });
-
-        // Cancel add bookmark
-        document.getElementById('cancelAddBtn').addEventListener('click', () => {
-            this.hideAddBookmarkModal();
-        });
-
-        // Add bookmark form submission
-        document.getElementById('addBookmarkForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.addBookmark();
-        });
-
-        // URL input change for favicon loading
-        document.getElementById('bookmarkUrl').addEventListener('input', (e) => {
-            this.handleUrlInputChange(e.target.value);
-        });
-
-        // Edit URL input change for favicon loading
-        document.getElementById('editBookmarkUrl').addEventListener('input', (e) => {
-            this.handleEditUrlInputChange(e.target.value);
-        });
-
-        // Remove view toggle listeners since we only have favicon view now
-
-        // Edit bookmark modal events
-        document.getElementById('cancelEditBtn').addEventListener('click', () => {
-            this.cancelEditBookmarkModal();
-        });
-
-        document.getElementById('editBookmarkForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            console.log('Form submission triggered');
-            this.updateBookmark();
-        });
-
-        // ESC key to close modals
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                this.hideAddBookmarkModal();
-                this.cancelEditBookmarkModal();
-                this.hideDeleteConfirmation();
-                this.hideSettingsModal();
-                this.closeFolderModal();
-                this.hideCreateFolderModal();
-                this.hideRenameFolderModal();
-                this.hideContextMenu();
-            }
-        });
-
-        // Backdrop click handling for modals
-        document.getElementById('editBookmarkModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                this.cancelEditBookmarkModal();
-            }
-        });
-
-        document.getElementById('addBookmarkModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                this.hideAddBookmarkModal();
-            }
-        });
-
-        // Context menu events
-        document.getElementById('editBookmark').addEventListener('click', () => {
-            this.showEditBookmarkModal();
-            this.hideContextMenu();
-        });
-
-        document.getElementById('duplicateBookmark').addEventListener('click', () => {
-            this.duplicateBookmark();
-            this.hideContextMenu();
-        });
-
-        document.getElementById('copyBookmarkUrl').addEventListener('click', () => {
-            this.copyBookmarkUrl();
-            this.hideContextMenu();
-        });
-
-        document.getElementById('deleteBookmark').addEventListener('click', (e) => {
-            this.showDeleteConfirmation(e);
-            this.hideContextMenu();
-        });
-
-        // Delete confirmation popup events
-        document.getElementById('cancelDeleteBtn').addEventListener('click', () => {
-            this.hideDeleteConfirmation();
-        });
-
-        document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
-            this.confirmDeleteBookmark();
-            this.hideDeleteConfirmation();
-        });
-
-        // Settings button
-        document.getElementById('settingsBtn').addEventListener('click', () => {
-            this.showSettingsModal();
-        });
-
-        // Sync buttons
-        document.getElementById('pullFromServerBtn').addEventListener('click', async () => {
-            const btn = document.getElementById('pullFromServerBtn');
-            btn.disabled = true;
-            btn.querySelector('span').textContent = 'Pulling...';
-            const ok = await this.pullFromServer();
-            btn.disabled = false;
-            btn.querySelector('span').textContent = ok ? 'Pulled!' : 'Failed';
-            setTimeout(() => { btn.querySelector('span').textContent = 'Pull from Server'; }, 2000);
-        });
-
-        document.getElementById('pushToServerBtn').addEventListener('click', async () => {
-            const btn = document.getElementById('pushToServerBtn');
-            btn.disabled = true;
-            btn.querySelector('span').textContent = 'Pushing...';
-            const ok = await this.pushToServer();
-            btn.disabled = false;
-            btn.querySelector('span').textContent = ok ? 'Pushed!' : 'Failed';
-            setTimeout(() => { btn.querySelector('span').textContent = 'Push to Server'; }, 2000);
-        });
-
-        // Settings modal events - removed Save/Cancel buttons, settings apply immediately
-
-        // Settings modal - no backdrop click handler needed since no backdrop
-
-        // Folder modal events
-        document.getElementById('closeFolderBtn').addEventListener('click', () => {
-            this.closeFolderModal();
-        });
-
-        document.getElementById('folderModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                this.closeFolderModal();
-            }
-        });
-
-        // Create folder modal events
-        document.getElementById('cancelCreateFolderBtn').addEventListener('click', () => {
-            this.hideCreateFolderModal();
-        });
-
-        document.getElementById('createFolderForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.createFolderFromModal();
-        });
-
-        document.getElementById('createFolderModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                this.hideCreateFolderModal();
-            }
-        });
-
-        // Folder context menu events
-        document.getElementById('renameFolder').addEventListener('click', () => {
-            this.showRenameFolderModal();
-            this.hideContextMenu();
-        });
-
-        document.getElementById('deleteFolder').addEventListener('click', (e) => {
-            this.showFolderDeleteConfirmation(e);
-            this.hideContextMenu();
-        });
-
-        // Rename folder modal events
-        document.getElementById('cancelRenameFolderBtn').addEventListener('click', () => {
-            this.hideRenameFolderModal();
-        });
-
-        document.getElementById('renameFolderForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.renameFolderFromModal();
-        });
-
-        document.getElementById('renameFolderModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                this.hideRenameFolderModal();
-            }
-        });
-
-
-        // Toggle switch styling and immediate settings save
-        document.getElementById('showTitles').addEventListener('change', (e) => {
-            this.updateToggleVisual(e.target);
-            this.settings.showTitles = e.target.checked;
-            this.saveSettings();
-            this.renderQuickAccess(); // Re-render to show/hide titles immediately
-        });
-
-        // Show/Hide Add Button toggle
-        document.getElementById('showAddButton').addEventListener('change', (e) => {
-            this.updateToggleVisual(e.target);
-            this.settings.showAddButton = e.target.checked;
-            this.saveSettings();
-            this.renderQuickAccess(); // Re-render to show/hide add button immediately
-        });
-
-        // Tiles per row slider
-        document.getElementById('tilesPerRow').addEventListener('input', (e) => {
-            const value = parseInt(e.target.value);
-            document.getElementById('tilesPerRowValue').textContent = value;
-            this.settings.tilesPerRow = value;
-            this.saveSettings();
-            this.updateTilesPerRowCSS(value);
-        });
-
-        // Tile gap slider
-        document.getElementById('tileGap').addEventListener('input', (e) => {
-            const value = parseInt(e.target.value);
-            document.getElementById('tileGapValue').textContent = value;
-            this.settings.tileGap = value;
-            this.saveSettings();
-            this.updateTilesPerRowCSS(this.settings.tilesPerRow);
-        });
-
-        // Hide context menu when clicking elsewhere
-        document.addEventListener('click', (e) => {
-            const isClickInsideModal = e.target.closest('#contextMenu') || 
-                                      e.target.closest('#editBookmarkModal') || 
-                                      e.target.closest('#deleteConfirmPopup') ||
-                                      e.target.closest('#addBookmarkModal') ||
-                                      e.target.closest('#settingsModal') ||
-                                      e.target.closest('#settingsBtn') ||
-                                      e.target.closest('#folderModal') ||
-                                      e.target.closest('#createFolderModal') ||
-                                      e.target.closest('#renameFolderModal');
-            
-            if (!isClickInsideModal) {
-                this.hideContextMenu();
-                this.hideDeleteConfirmation();
-                
-                // Check modal states
-                const editModalOpen = !document.getElementById('editBookmarkModal').classList.contains('hidden');
-                const addModalOpen = !document.getElementById('addBookmarkModal').classList.contains('hidden');
-                const settingsModalOpen = !document.getElementById('settingsModal').classList.contains('hidden');
-                const folderModalOpen = !document.getElementById('folderModal').classList.contains('hidden');
-                const createFolderModalOpen = !document.getElementById('createFolderModal').classList.contains('hidden');
-                const renameFolderModalOpen = !document.getElementById('renameFolderModal').classList.contains('hidden');
-                
-                // Close settings modal if it's open
-                if (settingsModalOpen) {
-                    this.hideSettingsModal();
-                }
-                
-                // Only clear currentBookmarkId if no modals are open
-                if (!editModalOpen && !addModalOpen && !settingsModalOpen && !folderModalOpen && !createFolderModalOpen && !renameFolderModalOpen) {
-                    console.log('Clearing currentBookmarkId and currentFolderId due to click outside');
-                    this.currentBookmarkId = null;
-                    this.currentFolderId = null;
-                }
-            }
-        });
-
-        // Prevent default context menu
-        document.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-        });
-
-        // Paste functionality for adding bookmarks
-        this.setupPasteListener();
-
-        // Drag and drop functionality
-        this.setupDragAndDrop();
-    }
-
-    setupPasteListener() {
-        document.addEventListener('paste', async (e) => {
-            // Don't interfere if user is pasting into an input field
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                return;
-            }
-
-            e.preventDefault();
-            
-            try {
-                const clipboardText = await navigator.clipboard.readText();
-                await this.handlePastedContent(clipboardText);
-            } catch (error) {
-                console.log('Could not read clipboard:', error);
-                // Fallback to event clipboardData if clipboard API fails
-                const clipboardText = e.clipboardData?.getData('text/plain');
-                if (clipboardText) {
-                    await this.handlePastedContent(clipboardText);
-                }
-            }
-        });
-    }
-
-    async handlePastedContent(content) {
-        if (!content || !content.trim()) return;
-
-        // Check if the content is a valid URL
-        if (this.isValidUrl(content.trim())) {
-            const url = content.trim();
-            let title = '';
-
-            // Try to extract title from URL
-            try {
-                const hostname = new URL(url).hostname;
-                title = hostname.replace('www.', '');
-                title = title.charAt(0).toUpperCase() + title.slice(1);
-            } catch (e) {
-                title = 'Bookmark';
-            }
-
-            // Show the add bookmark modal with pre-filled URL
-            this.showAddBookmarkModal();
-            document.getElementById('bookmarkUrl').value = url;
-            document.getElementById('bookmarkTitle').value = title;
-            
-            // Trigger favicon loading for the pasted URL
-            this.handleUrlInputChange(url);
-            
-            document.getElementById('bookmarkTitle').focus();
-            document.getElementById('bookmarkTitle').select();
-        } else {
-            // Check if content contains a URL within text (like "Check out https://example.com")
-            const urlMatch = content.match(/(https?:\/\/[^\s]+)/i);
-            if (urlMatch) {
-                const url = urlMatch[1];
-                const title = content.replace(urlMatch[0], '').trim() || this.extractTitleFromUrl(url);
-                
-                this.showAddBookmarkModal();
-                document.getElementById('bookmarkUrl').value = url;
-                document.getElementById('bookmarkTitle').value = title;
-                
-                // Trigger favicon loading for the extracted URL
-                this.handleUrlInputChange(url);
-                
-                document.getElementById('bookmarkTitle').focus();
-                document.getElementById('bookmarkTitle').select();
-            }
-        }
-    }
-
-    extractTitleFromUrl(url) {
-        try {
-            const hostname = new URL(url).hostname;
-            let title = hostname.replace('www.', '');
-            return title.charAt(0).toUpperCase() + title.slice(1);
-        } catch (e) {
-            return 'Bookmark';
-        }
-    }
-
-    setupDragAndDrop() {
-        const body = document.body;
-        let dragCounter = 0;
-        
-        // Prevent default drag behaviors on document
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            document.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-            }, false);
-        });
-
-        // Handle drag enter
-        body.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-            
-            // Only show overlay for external drags (not internal bookmark reordering)
-            if (!this.isDragging) {
-                dragCounter++;
-                
-                // Add a visual overlay to indicate drop zone (excluding header)
-                if (!document.getElementById('dropOverlay')) {
-                    const header = document.querySelector('header');
-                    const headerHeight = header ? header.offsetHeight : 0;
-                    
-                    const overlay = document.createElement('div');
-                    overlay.id = 'dropOverlay';
-                    overlay.className = 'fixed left-0 right-0 bottom-0 bg-blue-100/10 backdrop-blur-sm border-4 border-dashed border-blue-400 z-40 flex items-center justify-center';
-                    overlay.style.top = `${headerHeight}px`; // Start exactly at bottom of header
-                    overlay.innerHTML = '<div class="text-blue-600 text-xl font-semibold">Drop bookmark here</div>';
-                    body.appendChild(overlay);
-                }
-            }
-        });
-
-        // Handle drag over (required for drop to work)
-        body.addEventListener('dragover', (e) => {
-            e.preventDefault();
-        });
-
-        // Handle drag leave
-        body.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            
-            // Only handle external drags
-            if (!this.isDragging) {
-                dragCounter--;
-                
-                // Only remove overlay when all drag operations are done
-                if (dragCounter === 0) {
-                    const overlay = document.getElementById('dropOverlay');
-                    if (overlay) {
-                        overlay.remove();
-                    }
-                }
-            }
-        });
-
-        // Handle drop on entire page
-        body.addEventListener('drop', (e) => {
-            e.preventDefault();
-            
-            // Only handle external drops (not internal bookmark reordering)
-            if (!this.isDragging) {
-                dragCounter = 0; // Reset counter on drop
-                const overlay = document.getElementById('dropOverlay');
-                if (overlay) {
-                    overlay.remove();
-                }
-                
-                // Get the dragged data - Chrome bookmarks provide multiple data formats
-                const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
-            
-            // Try to get the bookmark title from different data types
-            let title = '';
-            
-            // Debug: log all available data types
-            console.log('Available data types:', e.dataTransfer.types);
-            
-            // Try various data formats to get the bookmark name
-            const htmlData = e.dataTransfer.getData('text/html');
-            const plainText = e.dataTransfer.getData('text/plain');
-            const mozText = e.dataTransfer.getData('text/x-moz-text-internal');
-            const mozHtml = e.dataTransfer.getData('application/x-moz-nativehtml');
-            
-            console.log('Data extraction:', { htmlData, plainText, mozText, mozHtml, url });
-            
-            // First priority: Extract title from HTML data (most reliable for bookmarks)
-            if (htmlData) {
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = htmlData;
-                const linkElement = tempDiv.querySelector('a');
-                if (linkElement && linkElement.textContent && 
-                    linkElement.textContent.trim() !== url && 
-                    !linkElement.textContent.trim().startsWith('http')) {
-                    title = linkElement.textContent.trim();
-                }
-            }
-            
-            // Second priority: Use Mozilla-specific data formats
-            if (!title && mozText && mozText !== url && !mozText.startsWith('http')) {
-                title = mozText.trim();
-            }
-            
-            // Third priority: Use plain text if it's not a URL
-            if (!title && plainText && plainText !== url && !plainText.startsWith('http')) {
-                title = plainText.trim();
-            }
-            
-                if (url && this.isValidUrl(url)) {
-                    this.addBookmarkFromDrop(title, url);
-                }
-            }
-        });
-    }
-
-    isValidUrl(string) {
-        try {
-            new URL(string);
-            return true;
-        } catch (_) {
-            return false;
-        }
-    }
-
-    normalizeUrl(url) {
-        if (!url || !url.trim()) return url;
-        
-        const trimmedUrl = url.trim();
-        
-        // If it already has a protocol, return as is
-        if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://')) {
-            return trimmedUrl;
-        }
-        
-        // If it looks like a URL (contains a dot and domain pattern), prefix with https://
-        if (trimmedUrl.includes('.') && /^[a-zA-Z0-9]/.test(trimmedUrl)) {
-            return 'https://' + trimmedUrl;
-        }
-        
-        return trimmedUrl;
-    }
-
-    isValidUrlOrCanBeNormalized(string) {
-        if (!string || !string.trim()) return false;
-        
-        // First check if it's already valid
-        if (this.isValidUrl(string)) return true;
-        
-        // Then check if it can be normalized to a valid URL
-        const normalized = this.normalizeUrl(string);
-        return this.isValidUrl(normalized);
-    }
-
-    extractTitleFromDocument(doc) {
-        // Try different title sources in order of preference
-        const titleSources = [
-            'meta[property="og:title"]',
-            'meta[name="twitter:title"]',
-            'title',
-            'h1'
-        ];
-
-        for (const selector of titleSources) {
-            const element = doc.querySelector(selector);
-            if (element) {
-                const title = element.getAttribute('content') || element.textContent || '';
-                const cleanTitle = title.trim();
-                if (cleanTitle) {
-                    return cleanTitle;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    async getHighResolutionFavicon(url) {
-        const hostname = new URL(url).hostname;
-        const origin = new URL(url).origin;
-        
-        // Check if we have a cached favicon for this domain
-        const cachedFavicon = await this.getCachedFavicon(hostname);
-        if (cachedFavicon) {
-            return cachedFavicon;
-        }
-        
-        let faviconUrl = null;
-        
-        // First try to parse HTML to find declared favicon links
-        try {
-            const response = await fetch(url);
-            if (response.ok) {
-                const html = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                // Look for various favicon declarations in order of preference
-                const faviconSelectors = [
-                    'link[rel*="icon"][sizes*="192"]',
-                    'link[rel*="icon"][sizes*="180"]',
-                    'link[rel*="icon"][sizes*="152"]',
-                    'link[rel*="icon"][sizes*="144"]',
-                    'link[rel*="icon"][sizes*="128"]',
-                    'link[rel*="icon"][sizes*="96"]',
-                    'link[rel*="icon"][sizes*="72"]',
-                    'link[rel*="icon"][sizes*="64"]',
-                    'link[rel*="icon"][sizes*="48"]',
-                    'link[rel*="icon"][sizes*="32"]',
-                    'link[rel="apple-touch-icon"]',
-                    'link[rel="apple-touch-icon-precomposed"]',
-                    'link[rel="icon"]',
-                    'link[rel="shortcut icon"]'
-                ];
-                
-                for (const selector of faviconSelectors) {
-                    const link = doc.querySelector(selector);
-                    if (link && link.href) {
-                        const testUrl = new URL(link.href, url).href;
-                        // Test if the favicon actually exists and download it
-                        const cachedData = await this.downloadAndCacheFavicon(hostname, testUrl);
-                        if (cachedData) {
-                            return cachedData;
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            // If HTML parsing fails, fall back to hardcoded paths
-        }
-        
-        // Fallback to common favicon paths
-        const faviconSources = [
-            `${origin}/apple-touch-icon.png`,
-            `${origin}/apple-touch-icon-180x180.png`,
-            `${origin}/apple-touch-icon-152x152.png`,
-            `${origin}/apple-touch-icon-144x144.png`,
-            `${origin}/apple-touch-icon-120x120.png`,
-            `${origin}/android-chrome-192x192.png`,
-            `${origin}/favicon-196x196.png`,
-            `${origin}/favicon-128x128.png`,
-            `${origin}/favicon-96x96.png`,
-            `${origin}/favicon-64x64.png`,
-            `${origin}/favicon-32x32.png`,
-            `${origin}/favicon.png`,
-            `${origin}/favicon.ico`
-        ];
-
-        for (const testUrl of faviconSources) {
-            const cachedData = await this.downloadAndCacheFavicon(hostname, testUrl);
-            if (cachedData) {
-                return cachedData;
-            }
-        }
-        
-        // If no favicon found, return null (no fallback)
-        return null;
-    }
-
-    async testFaviconUrl(url) {
-        try {
-            const response = await fetch(url, { 
-                method: 'HEAD',
-                mode: 'no-cors'
-            });
-            return response.ok || response.type === 'opaque';
-        } catch (e) {
-            return false;
-        }
-    }
-
-    async getCachedFavicon(hostname) {
-        try {
-            const result = await chrome.storage.local.get(['faviconCache']);
-            const cache = result.faviconCache || {};
-            return cache[hostname] || null;
-        } catch (e) {
-            console.log('Failed to get cached favicon:', e);
-            return null;
-        }
-    }
-
-    async downloadAndCacheFavicon(hostname, faviconUrl) {
-        try {
-            const response = await fetch(faviconUrl);
-            if (!response.ok) {
-                return null;
-            }
-
-            const blob = await response.blob();
-            
-            // Check if it's a valid image
-            if (!blob.type.startsWith('image/')) {
-                return null;
-            }
-
-            // Convert to base64 data URL
-            const base64Data = await this.blobToBase64(blob);
-            
-            // Cache the favicon
-            await this.cacheFavicon(hostname, base64Data);
-            
-            return base64Data;
-        } catch (e) {
-            console.log('Failed to download favicon:', e);
-            return null;
-        }
-    }
-
-    async blobToBase64(blob) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-    }
-
-    async cacheFavicon(hostname, base64Data) {
-        try {
-            const result = await chrome.storage.local.get(['faviconCache']);
-            const cache = result.faviconCache || {};
-            cache[hostname] = base64Data;
-            
-            // Limit cache size by removing old entries if needed
-            const cacheKeys = Object.keys(cache);
-            if (cacheKeys.length > 100) {
-                // Remove the oldest 20 entries (simple cleanup)
-                cacheKeys.slice(0, 20).forEach(key => delete cache[key]);
-            }
-            
-            await chrome.storage.local.set({ faviconCache: cache });
-        } catch (e) {
-            console.log('Failed to cache favicon:', e);
-        }
-    }
-
-    async cleanupUnusedFavicons() {
-        try {
-            const result = await chrome.storage.local.get(['faviconCache']);
-            const cache = result.faviconCache || {};
-            
-            // Get all hostnames currently used by bookmarks
-            const usedHostnames = new Set();
-            for (const bookmark of this.bookmarks) {
-                if (bookmark.url) {
-                    try {
-                        const hostname = new URL(bookmark.url).hostname;
-                        usedHostnames.add(hostname);
-                    } catch (e) {
-                        // Invalid URL, skip
-                    }
-                }
-            }
-            
-            // Remove cached favicons for hostnames no longer used
-            const cacheKeys = Object.keys(cache);
-            let removed = 0;
-            for (const hostname of cacheKeys) {
-                if (!usedHostnames.has(hostname)) {
-                    delete cache[hostname];
-                    removed++;
-                }
-            }
-            
-            if (removed > 0) {
-                await chrome.storage.local.set({ faviconCache: cache });
-                console.log(`Cleaned up ${removed} unused favicons from cache`);
-            }
-        } catch (e) {
-            console.log('Failed to cleanup favicon cache:', e);
-        }
-    }
-
-    async addBookmarkFromDrop(title, url) {
-        // Use the provided bookmark title if available, otherwise extract from URL
-        let bookmarkTitle = title;
-        if (!title || title.trim() === '' || title === url || title.startsWith('http')) {
-            try {
-                const hostname = new URL(url).hostname;
-                bookmarkTitle = hostname.replace('www.', '');
-                bookmarkTitle = bookmarkTitle.charAt(0).toUpperCase() + bookmarkTitle.slice(1);
-            } catch (e) {
-                bookmarkTitle = 'Bookmark';
-            }
-        }
-
-        // Show the add bookmark modal with pre-filled data
-        this.showAddBookmarkModal();
-        document.getElementById('bookmarkTitle').value = bookmarkTitle;
-        document.getElementById('bookmarkUrl').value = url;
-        
-        // Trigger favicon loading for the dropped URL
-        this.handleUrlInputChange(url);
-        
-        // Focus the title field and select the text for easy editing
-        setTimeout(() => {
-            const titleInput = document.getElementById('bookmarkTitle');
-            titleInput.focus();
-            titleInput.select();
-        }, 100);
-    }
-
-    async loadBookmarks() {
-        // Always load from local storage (fast, offline-first)
-        try {
-            const result = await chrome.storage.local.get(['bookmarks', 'folders']);
-            this.bookmarks = result.bookmarks || await this.getDefaultBookmarks();
-            this.folders = result.folders || [];
-            console.log('Loaded bookmarks from local storage');
-        } catch (error) {
-            console.log('Error loading from local storage:', error.message);
-            this.bookmarks = await this.getDefaultBookmarks();
-            this.folders = [];
-        }
-    }
-
-    async pullFromServer() {
-        // Pull all data from server and replace local storage
-        if (!api.isAuthenticated()) {
-            console.log('Not authenticated, cannot pull from server');
-            return false;
-        }
-        try {
-            const [bookmarks, folders, settings] = await Promise.all([
-                api.listBookmarks(),
-                api.listFolders(),
-                api.getSettings(),
-            ]);
-            this.bookmarks = bookmarks;
-            this.folders = folders;
-            this.settings = { ...this.settings, ...settings };
-            await this.saveBookmarks();
-            await this.saveSettingsToStorage();
-            this.loadCurrentSettingsIntoForm();
-            this.updateTilesPerRowCSS(this.settings.tilesPerRow);
-            this.renderQuickAccess();
-            console.log('✅ Pulled data from server');
-            return true;
-        } catch (error) {
-            console.error('Error pulling from server:', error);
-            return false;
-        }
-    }
-
-    async pushToServer() {
-        // Push all local data to server via the import endpoint
-        if (!api.isAuthenticated()) return false;
-        try {
-            const exportPayload = {
-                bookmarks: this.bookmarks.map((b, i) => ({
-                    id: b.id,
-                    title: b.title,
-                    url: b.url,
-                    favicon: b.favicon || null,
-                    date_added: b.dateAdded || new Date().toISOString(),
-                    parent_id: b.folderId || null,
-                    position: i,
-                })),
-                folders: this.folders.map((f, i) => ({
-                    id: f.id,
-                    title: f.name,
-                    date_added: f.dateCreated || new Date().toISOString(),
-                    parent_id: null,
-                    position: i,
-                })),
-                settings: {
-                    show_titles: this.settings.showTitles,
-                    tiles_per_row: this.settings.tilesPerRow,
-                    tile_gap: this.settings.tileGap,
-                    show_add_button: this.settings.showAddButton,
-                },
-                export_date: new Date().toISOString(),
-                version: 1,
-            };
-            await api.importData(exportPayload);
-            console.log('✅ Pushed all data to server');
-            return true;
-        } catch (error) {
-            console.error('Error pushing to server:', error);
-            return false;
-        }
-    }
-
-
-    async getDefaultBookmarks() {
-        const defaultUrls = [
-            { title: 'Google', url: 'https://www.google.com' },
-            { title: 'GitHub', url: 'https://github.com' },
-            { title: 'Stack Overflow', url: 'https://stackoverflow.com' },
-            { title: 'YouTube', url: 'https://www.youtube.com' }
-        ];
-
-        const bookmarks = [];
-        for (let i = 0; i < defaultUrls.length; i++) {
-            const { title, url } = defaultUrls[i];
-            const favicon = await this.getHighResolutionFavicon(url);
-            bookmarks.push({
-                id: Date.now() + i + 1,
-                title,
-                url,
-                favicon,
-                dateAdded: new Date().toISOString(),
-                folderId: null
-            });
-        }
-        
-        return bookmarks;
-    }
-
-    async saveBookmarks() {
-        // Always persist to local storage (primary source of truth)
-        try {
-            await chrome.storage.local.set({ bookmarks: this.bookmarks, folders: this.folders });
-        } catch (error) {
-            console.error('Error saving bookmarks to local storage:', error);
-        }
-    }
-
-    showAddBookmarkModal() {
-        document.getElementById('addBookmarkModal').classList.remove('hidden');
-        
-        // Show favicon selection UI immediately with empty state
-        const faviconSelection = document.getElementById('faviconSelection');
-        const faviconOptions = document.getElementById('faviconOptions');
-        faviconSelection.classList.remove('hidden');
-        faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Enter a URL to load favicon options</div>';
-        
-        document.getElementById('bookmarkTitle').focus();
-    }
-
-    hideAddBookmarkModal() {
-        document.getElementById('addBookmarkModal').classList.add('hidden');
-        document.getElementById('addBookmarkForm').reset();
-        document.getElementById('faviconSelection').classList.add('hidden');
-        this.selectedFavicon = null;
-        if (this.faviconDebounceTimer) {
-            clearTimeout(this.faviconDebounceTimer);
-        }
-    }
-
-    handleUrlInputChange(url) {
-        if (this.faviconDebounceTimer) {
-            clearTimeout(this.faviconDebounceTimer);
-        }
-
-        if (!url || !this.isValidUrlOrCanBeNormalized(url)) {
-            document.getElementById('faviconSelection').classList.add('hidden');
-            this.selectedFavicon = null;
-            return;
-        }
-
-        // Show favicon selection UI immediately
-        const faviconSelection = document.getElementById('faviconSelection');
-        const faviconOptions = document.getElementById('faviconOptions');
-        faviconSelection.classList.remove('hidden');
-        faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
-
-        this.faviconDebounceTimer = setTimeout(() => {
-            const normalizedUrl = this.normalizeUrl(url);
-            
-            // Update the input field with the normalized URL if it changed
-            if (normalizedUrl !== url) {
-                document.getElementById('bookmarkUrl').value = normalizedUrl;
-            }
-            
-            this.loadFaviconOptions(normalizedUrl);
-        }, 500);
-    }
-
-    handleEditUrlInputChange(url) {
-        if (this.editFaviconDebounceTimer) {
-            clearTimeout(this.editFaviconDebounceTimer);
-        }
-
-        if (!url || !this.isValidUrlOrCanBeNormalized(url)) {
-            document.getElementById('editFaviconSelection').classList.add('hidden');
-            this.selectedEditFavicon = null;
-            return;
-        }
-
-        // Show favicon selection UI immediately
-        const faviconSelection = document.getElementById('editFaviconSelection');
-        const faviconOptions = document.getElementById('editFaviconOptions');
-        faviconSelection.classList.remove('hidden');
-        faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
-
-        this.editFaviconDebounceTimer = setTimeout(() => {
-            const normalizedUrl = this.normalizeUrl(url);
-            
-            // Update the input field with the normalized URL if it changed
-            if (normalizedUrl !== url) {
-                document.getElementById('editBookmarkUrl').value = normalizedUrl;
-            }
-            
-            this.loadEditFaviconOptions(normalizedUrl);
-        }, 500);
-    }
-
-    async loadFaviconOptions(url) {
-        const faviconSelection = document.getElementById('faviconSelection');
-        const faviconOptions = document.getElementById('faviconOptions');
-        
-        faviconSelection.classList.remove('hidden');
-        faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
-
-        try {
-            const result = await this.getAllFaviconUrlsAndTitle(url);
-            this.displayFaviconOptions(result.faviconUrls);
-            
-            // Auto-fill title if it's empty and we extracted a title
-            const titleInput = document.getElementById('bookmarkTitle');
-            if (result.pageTitle && (!titleInput.value || titleInput.value.trim() === '')) {
-                titleInput.value = result.pageTitle;
-            }
-        } catch (error) {
-            faviconOptions.innerHTML = '<div class="text-sm text-red-500 col-span-6 text-center">Failed to load favicon options</div>';
-        }
-    }
-
-    async loadEditFaviconOptions(url) {
-        const faviconSelection = document.getElementById('editFaviconSelection');
-        const faviconOptions = document.getElementById('editFaviconOptions');
-        
-        faviconSelection.classList.remove('hidden');
-        faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
-
-        try {
-            const result = await this.getAllFaviconUrlsAndTitle(url);
-            this.displayEditFaviconOptions(result.faviconUrls);
-            
-            // Auto-fill title if it's empty and we extracted a title
-            const titleInput = document.getElementById('editBookmarkTitle');
-            if (result.pageTitle && (!titleInput.value || titleInput.value.trim() === '')) {
-                titleInput.value = result.pageTitle;
-            }
-        } catch (error) {
-            faviconOptions.innerHTML = '<div class="text-sm text-red-500 col-span-6 text-center">Failed to load favicon options</div>';
-        }
-    }
-
-    async getAllFaviconUrls(url) {
-        const result = await this.getAllFaviconUrlsAndTitle(url);
-        return result.faviconUrls;
-    }
-
-    async getAllFaviconUrlsAndTitle(url) {
-        const hostname = new URL(url).hostname;
-        const origin = new URL(url).origin;
-        const faviconUrls = [];
-        let pageTitle = null;
-
-        // Check if we have a cached favicon for this domain
-        const cachedFavicon = await this.getCachedFavicon(hostname);
-        if (cachedFavicon) {
-            faviconUrls.push({
-                url: cachedFavicon,
-                label: 'Cached Favicon'
-            });
-        }
-
-        try {
-            const response = await fetch(url);
-            if (response.ok) {
-                const html = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                // Extract page title
-                pageTitle = this.extractTitleFromDocument(doc);
-                
-                const faviconSelectors = [
-                    'link[rel*="icon"][sizes*="192"]',
-                    'link[rel*="icon"][sizes*="180"]',
-                    'link[rel*="icon"][sizes*="152"]',
-                    'link[rel*="icon"][sizes*="144"]',
-                    'link[rel*="icon"][sizes*="128"]',
-                    'link[rel*="icon"][sizes*="96"]',
-                    'link[rel="apple-touch-icon"]',
-                    'link[rel="apple-touch-icon-precomposed"]',
-                    'link[rel="icon"]',
-                    'link[rel="shortcut icon"]'
-                ];
-                
-                for (const selector of faviconSelectors) {
-                    const links = doc.querySelectorAll(selector);
-                    for (const link of links) {
-                        if (link.href) {
-                            const faviconUrl = new URL(link.href, url).href;
-                            const sizes = link.getAttribute('sizes') || 'unspecified';
-                            faviconUrls.push({
-                                url: faviconUrl,
-                                label: `${link.rel} (${sizes})`
-                            });
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.log('Could not parse HTML for favicons');
-        }
-        
-        // Add alternative favicon services (these work better for authentication-protected sites)
-        const alternativeSources = [
-            { url: `https://icons.duckduckgo.com/ip3/${hostname}.ico`, label: 'DuckDuckGo Favicon' },
-            { url: `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`, label: 'Google Favicon (64px)' },
-        ];
-
-        for (const {url: faviconUrl, label} of alternativeSources) {
-            faviconUrls.push({
-                url: faviconUrl,
-                label: label
-            });
-        }
-
-        // Add common favicon paths
-        const commonPaths = [
-            { path: '/apple-touch-icon.png', label: 'Apple Touch Icon' },
-            { path: '/favicon-192x192.png', label: 'Android Chrome 192x192' },
-            { path: '/favicon-96x96.png', label: 'Favicon 96x96' },
-            { path: '/favicon-32x32.png', label: 'Favicon 32x32' },
-            { path: '/favicon.ico', label: 'Classic Favicon' }
-        ];
-
-        for (const {path, label} of commonPaths) {
-            faviconUrls.push({
-                url: `${origin}${path}`,
-                label: label
-            });
-        }
-
-        // Remove duplicates
-        const uniqueUrls = [];
-        const seenUrls = new Set();
-        for (const favicon of faviconUrls) {
-            if (!seenUrls.has(favicon.url)) {
-                seenUrls.add(favicon.url);
-                uniqueUrls.push(favicon);
-            }
-        }
-
-        return {
-            faviconUrls: uniqueUrls,
-            pageTitle: pageTitle
-        };
-    }
-
-    async displayFaviconOptions(faviconUrls) {
-        const faviconOptions = document.getElementById('faviconOptions');
-        
-        if (faviconUrls.length === 0) {
-            faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">No favicon options found</div>';
-            return;
-        }
-
-        faviconOptions.innerHTML = '';
-        
-        for (let i = 0; i < faviconUrls.length; i++) {
-            const favicon = faviconUrls[i];
-            const faviconElement = document.createElement('div');
-            faviconElement.className = 'favicon-option w-10 h-10 border border-gray-300 rounded cursor-pointer hover:border-blue-500 flex items-center justify-center bg-white transition-colors';
-            faviconElement.title = favicon.label;
-            faviconElement.dataset.faviconUrl = favicon.url;
-            
-            const img = document.createElement('img');
-            img.src = favicon.url;
-            img.className = 'w-8 h-8 rounded';
-            img.style.display = 'block';
-            
-            const fallback = document.createElement('div');
-            fallback.className = 'w-8 h-8 bg-gray-300 rounded flex items-center justify-center text-xs text-gray-600';
-            fallback.textContent = '?';
-            fallback.style.display = 'none';
-            
-            img.onerror = () => {
-                img.style.display = 'none';
-                fallback.style.display = 'flex';
-                // Mark this favicon as problematic
-                faviconElement.classList.add('favicon-error');
-                faviconElement.title = favicon.label + ' (failed to load)';
-            };
-            
-            faviconElement.appendChild(img);
-            faviconElement.appendChild(fallback);
-            
-            faviconElement.addEventListener('click', async () => {
-                await this.selectFavicon(faviconElement, favicon.url);
-            });
-            
-            faviconOptions.appendChild(faviconElement);
-            
-            // Auto-select first option
-            if (i === 0) {
-                await this.selectFavicon(faviconElement, favicon.url);
-            }
-        }
-    }
-
-    async displayEditFaviconOptions(faviconUrls) {
-        const faviconOptions = document.getElementById('editFaviconOptions');
-        
-        if (faviconUrls.length === 0) {
-            faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">No favicon options found</div>';
-            return;
-        }
-
-        faviconOptions.innerHTML = '';
-        
-        for (let i = 0; i < faviconUrls.length; i++) {
-            const favicon = faviconUrls[i];
-            const faviconElement = document.createElement('div');
-            faviconElement.className = 'edit-favicon-option w-10 h-10 border border-gray-300 rounded cursor-pointer hover:border-blue-500 flex items-center justify-center bg-white transition-colors';
-            faviconElement.title = favicon.label;
-            faviconElement.dataset.faviconUrl = favicon.url;
-            
-            const img = document.createElement('img');
-            img.src = favicon.url;
-            img.className = 'w-8 h-8 rounded';
-            img.style.display = 'block';
-            
-            const fallback = document.createElement('div');
-            fallback.className = 'w-8 h-8 bg-gray-300 rounded flex items-center justify-center text-xs text-gray-600';
-            fallback.textContent = '?';
-            fallback.style.display = 'none';
-            
-            img.onerror = () => {
-                img.style.display = 'none';
-                fallback.style.display = 'flex';
-                // Mark this favicon as problematic
-                faviconElement.classList.add('favicon-error');
-                faviconElement.title = favicon.label + ' (failed to load)';
-            };
-            
-            faviconElement.appendChild(img);
-            faviconElement.appendChild(fallback);
-            
-            faviconElement.addEventListener('click', async () => {
-                await this.selectEditFavicon(faviconElement, favicon.url);
-            });
-            
-            faviconOptions.appendChild(faviconElement);
-            
-            // Auto-select first option
-            if (i === 0) {
-                await this.selectEditFavicon(faviconElement, favicon.url);
-            }
-        }
-    }
-
-    async selectFavicon(element, url) {
-        // Remove previous selection
-        const currentSelected = document.querySelector('.favicon-option.selected');
-        if (currentSelected) {
-            currentSelected.classList.remove('selected', 'border-blue-500', 'bg-blue-50');
-            currentSelected.classList.add('border-gray-300', 'bg-white');
-            currentSelected.style.borderWidth = '1px';
-        }
-        
-        // Add selection to new element
-        element.classList.remove('border-gray-300', 'bg-white');
-        element.classList.add('selected', 'border-blue-500', 'bg-blue-50');
-        element.style.borderWidth = '2px';
-        
-        // If this is not already a cached favicon (base64 data URL), cache it
-        if (!url.startsWith('data:')) {
-            const normalizedUrl = this.normalizeUrl(document.getElementById('bookmarkUrl').value);
-            const hostname = new URL(normalizedUrl).hostname;
-            const cachedData = await this.downloadAndCacheFavicon(hostname, url);
-            if (cachedData) {
-                this.selectedFavicon = cachedData;
-            } else {
-                this.selectedFavicon = null; // Don't use external URL if caching fails
-            }
-        } else {
-            this.selectedFavicon = url;
-        }
-    }
-
-    async selectEditFavicon(element, url) {
-        // Remove previous selection
-        const currentSelected = document.querySelector('.edit-favicon-option.selected');
-        if (currentSelected) {
-            currentSelected.classList.remove('selected', 'border-blue-500', 'bg-blue-50');
-            currentSelected.classList.add('border-gray-300', 'bg-white');
-            currentSelected.style.borderWidth = '1px';
-        }
-        
-        // Add selection to new element
-        element.classList.remove('border-gray-300', 'bg-white');
-        element.classList.add('selected', 'border-blue-500', 'bg-blue-50');
-        element.style.borderWidth = '2px';
-        
-        // If this is not already a cached favicon (base64 data URL), cache it
-        if (!url.startsWith('data:')) {
-            const normalizedUrl = this.normalizeUrl(document.getElementById('editBookmarkUrl').value);
-            const hostname = new URL(normalizedUrl).hostname;
-            const cachedData = await this.downloadAndCacheFavicon(hostname, url);
-            if (cachedData) {
-                this.selectedEditFavicon = cachedData;
-            } else {
-                this.selectedEditFavicon = null; // Don't use external URL if caching fails
-            }
-        } else {
-            this.selectedEditFavicon = url;
-        }
-    }
-
-    async addBookmark() {
-        const title = document.getElementById('bookmarkTitle').value.trim();
-        const rawUrl = document.getElementById('bookmarkUrl').value.trim();
-        const url = this.normalizeUrl(rawUrl);
-
-        if (!title || !url) return;
-
-        const favicon = this.selectedFavicon || '';
-        const faviconWasSelected = !!this.selectedFavicon;
-
-        const bookmark = {
-            id: Date.now(),
-            title,
-            url,
-            favicon,
-            dateAdded: new Date().toISOString(),
-            folderId: null,
-        };
-
-        this.bookmarks.unshift(bookmark);
-        await this.saveBookmarks();
+      }
+
+      // Bookmarks changed (e.g. from background worker pull)
+      if (changes.bookmarks && !this._localSaveInProgress) {
+        this.bookmarks = changes.bookmarks.newValue || [];
         this.renderQuickAccess();
+      }
+
+      // Folders changed
+      if (changes.folders && !this._localSaveInProgress) {
+        this.folders = changes.folders.newValue || [];
+        this.renderQuickAccess();
+      }
+
+      // Settings changed
+      if (changes.bookmarkSettings && !this._localSaveInProgress) {
+        const newSettings = changes.bookmarkSettings.newValue;
+        if (newSettings) {
+          this.settings = { ...this.settings, ...newSettings };
+          this.loadCurrentSettingsIntoForm();
+          this.updateTilesPerRowCSS(this.settings.tilesPerRow);
+          this.renderQuickAccess();
+        }
+      }
+    });
+  }
+
+  setupEventListeners() {
+    // Add bookmark button
+    document.getElementById("addBookmarkBtn").addEventListener("click", () => {
+      this.showAddBookmarkModal();
+    });
+
+    // Export button
+    document.getElementById("exportBtn").addEventListener("click", () => {
+      this.exportAllData();
+    });
+
+    // Import button
+    document.getElementById("importBtn").addEventListener("click", () => {
+      this.importAllData();
+    });
+
+    // Import modal buttons
+    document
+      .getElementById("confirmImportBtn")
+      .addEventListener("click", () => {
+        this.confirmImport();
+      });
+
+    document.getElementById("cancelImportBtn").addEventListener("click", () => {
+      this.hideImportConfirmModal();
+    });
+
+    // Import modal backdrop click
+    document
+      .getElementById("importConfirmModal")
+      .addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) {
+          this.hideImportConfirmModal();
+        }
+      });
+
+    // Create folder button
+    document.getElementById("createFolderBtn").addEventListener("click", () => {
+      this.showCreateFolderModal();
+    });
+
+    // Cancel add bookmark
+    document.getElementById("cancelAddBtn").addEventListener("click", () => {
+      this.hideAddBookmarkModal();
+    });
+
+    // Add bookmark form submission
+    document
+      .getElementById("addBookmarkForm")
+      .addEventListener("submit", (e) => {
+        e.preventDefault();
+        this.addBookmark();
+      });
+
+    // URL input change for favicon loading
+    document.getElementById("bookmarkUrl").addEventListener("input", (e) => {
+      this.handleUrlInputChange(e.target.value);
+    });
+
+    // Edit URL input change for favicon loading
+    document
+      .getElementById("editBookmarkUrl")
+      .addEventListener("input", (e) => {
+        this.handleEditUrlInputChange(e.target.value);
+      });
+
+    // Remove view toggle listeners since we only have favicon view now
+
+    // Edit bookmark modal events
+    document.getElementById("cancelEditBtn").addEventListener("click", () => {
+      this.cancelEditBookmarkModal();
+    });
+
+    document
+      .getElementById("editBookmarkForm")
+      .addEventListener("submit", (e) => {
+        e.preventDefault();
+        console.log("Form submission triggered");
+        this.updateBookmark();
+      });
+
+    // ESC key to close modals
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
         this.hideAddBookmarkModal();
+        this.cancelEditBookmarkModal();
+        this.hideDeleteConfirmation();
+        this.hideSettingsModal();
+        this.closeFolderModal();
+        this.hideCreateFolderModal();
+        this.hideRenameFolderModal();
+        this.hideContextMenu();
+      }
+    });
 
-        // Only update favicon async if no favicon was selected
-        if (!faviconWasSelected) {
-            this.updateFaviconAsync(bookmark.id, url);
+    // Backdrop click handling for modals
+    document
+      .getElementById("editBookmarkModal")
+      .addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) {
+          this.cancelEditBookmarkModal();
+        }
+      });
+
+    document
+      .getElementById("addBookmarkModal")
+      .addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) {
+          this.hideAddBookmarkModal();
+        }
+      });
+
+    // Context menu events
+    document.getElementById("editBookmark").addEventListener("click", () => {
+      this.showEditBookmarkModal();
+      this.hideContextMenu();
+    });
+
+    document
+      .getElementById("duplicateBookmark")
+      .addEventListener("click", () => {
+        this.duplicateBookmark();
+        this.hideContextMenu();
+      });
+
+    document.getElementById("copyBookmarkUrl").addEventListener("click", () => {
+      this.copyBookmarkUrl();
+      this.hideContextMenu();
+    });
+
+    document.getElementById("deleteBookmark").addEventListener("click", (e) => {
+      this.showDeleteConfirmation(e);
+      this.hideContextMenu();
+    });
+
+    // Delete confirmation popup events
+    document.getElementById("cancelDeleteBtn").addEventListener("click", () => {
+      this.hideDeleteConfirmation();
+    });
+
+    document
+      .getElementById("confirmDeleteBtn")
+      .addEventListener("click", () => {
+        this.confirmDeleteBookmark();
+        this.hideDeleteConfirmation();
+      });
+
+    // Settings button
+    document.getElementById("settingsBtn").addEventListener("click", () => {
+      this.showSettingsModal();
+    });
+
+    // Settings modal events - removed Save/Cancel buttons, settings apply immediately
+
+    // Settings modal - no backdrop click handler needed since no backdrop
+
+    // Folder modal events
+    document.getElementById("closeFolderBtn").addEventListener("click", () => {
+      this.closeFolderModal();
+    });
+
+    document.getElementById("folderModal").addEventListener("click", (e) => {
+      if (e.target === e.currentTarget) {
+        this.closeFolderModal();
+      }
+    });
+
+    // Create folder modal events
+    document
+      .getElementById("cancelCreateFolderBtn")
+      .addEventListener("click", () => {
+        this.hideCreateFolderModal();
+      });
+
+    document
+      .getElementById("createFolderForm")
+      .addEventListener("submit", (e) => {
+        e.preventDefault();
+        this.createFolderFromModal();
+      });
+
+    document
+      .getElementById("createFolderModal")
+      .addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) {
+          this.hideCreateFolderModal();
+        }
+      });
+
+    // Folder context menu events
+    document.getElementById("renameFolder").addEventListener("click", () => {
+      this.showRenameFolderModal();
+      this.hideContextMenu();
+    });
+
+    document.getElementById("deleteFolder").addEventListener("click", (e) => {
+      this.showFolderDeleteConfirmation(e);
+      this.hideContextMenu();
+    });
+
+    // Rename folder modal events
+    document
+      .getElementById("cancelRenameFolderBtn")
+      .addEventListener("click", () => {
+        this.hideRenameFolderModal();
+      });
+
+    document
+      .getElementById("renameFolderForm")
+      .addEventListener("submit", (e) => {
+        e.preventDefault();
+        this.renameFolderFromModal();
+      });
+
+    document
+      .getElementById("renameFolderModal")
+      .addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) {
+          this.hideRenameFolderModal();
+        }
+      });
+
+    // Toggle switch styling and immediate settings save
+    document.getElementById("showTitles").addEventListener("change", (e) => {
+      this.updateToggleVisual(e.target);
+      this.settings.showTitles = e.target.checked;
+      this.saveSettings();
+      this.renderQuickAccess(); // Re-render to show/hide titles immediately
+    });
+
+    // Show/Hide Add Button toggle
+    document.getElementById("showAddButton").addEventListener("change", (e) => {
+      this.updateToggleVisual(e.target);
+      this.settings.showAddButton = e.target.checked;
+      this.saveSettings();
+      this.renderQuickAccess(); // Re-render to show/hide add button immediately
+    });
+
+    // Tiles per row slider
+    document.getElementById("tilesPerRow").addEventListener("input", (e) => {
+      const value = parseInt(e.target.value);
+      document.getElementById("tilesPerRowValue").textContent = value;
+      this.settings.tilesPerRow = value;
+      this.saveSettings();
+      this.updateTilesPerRowCSS(value);
+    });
+
+    // Tile gap slider
+    document.getElementById("tileGap").addEventListener("input", (e) => {
+      const value = parseInt(e.target.value);
+      document.getElementById("tileGapValue").textContent = value;
+      this.settings.tileGap = value;
+      this.saveSettings();
+      this.updateTilesPerRowCSS(this.settings.tilesPerRow);
+    });
+
+    // Hide context menu when clicking elsewhere
+    document.addEventListener("click", (e) => {
+      const isClickInsideModal =
+        e.target.closest("#contextMenu") ||
+        e.target.closest("#editBookmarkModal") ||
+        e.target.closest("#deleteConfirmPopup") ||
+        e.target.closest("#addBookmarkModal") ||
+        e.target.closest("#settingsModal") ||
+        e.target.closest("#settingsBtn") ||
+        e.target.closest("#folderModal") ||
+        e.target.closest("#createFolderModal") ||
+        e.target.closest("#renameFolderModal");
+
+      if (!isClickInsideModal) {
+        this.hideContextMenu();
+        this.hideDeleteConfirmation();
+
+        // Check modal states
+        const editModalOpen = !document
+          .getElementById("editBookmarkModal")
+          .classList.contains("hidden");
+        const addModalOpen = !document
+          .getElementById("addBookmarkModal")
+          .classList.contains("hidden");
+        const settingsModalOpen = !document
+          .getElementById("settingsModal")
+          .classList.contains("hidden");
+        const folderModalOpen = !document
+          .getElementById("folderModal")
+          .classList.contains("hidden");
+        const createFolderModalOpen = !document
+          .getElementById("createFolderModal")
+          .classList.contains("hidden");
+        const renameFolderModalOpen = !document
+          .getElementById("renameFolderModal")
+          .classList.contains("hidden");
+
+        // Close settings modal if it's open
+        if (settingsModalOpen) {
+          this.hideSettingsModal();
         }
 
-        // Sync to server in background
-        this._syncCreateBookmark(bookmark);
+        // Only clear currentBookmarkId if no modals are open
+        if (
+          !editModalOpen &&
+          !addModalOpen &&
+          !settingsModalOpen &&
+          !folderModalOpen &&
+          !createFolderModalOpen &&
+          !renameFolderModalOpen
+        ) {
+          console.log(
+            "Clearing currentBookmarkId and currentFolderId due to click outside",
+          );
+          this.currentBookmarkId = null;
+          this.currentFolderId = null;
+        }
+      }
+    });
+
+    // Prevent default context menu
+    document.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+    });
+
+    // Paste functionality for adding bookmarks
+    this.setupPasteListener();
+
+    // Drag and drop functionality
+    this.setupDragAndDrop();
+  }
+
+  setupPasteListener() {
+    document.addEventListener("paste", async (e) => {
+      // Don't interfere if user is pasting into an input field
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+        return;
+      }
+
+      e.preventDefault();
+
+      try {
+        const clipboardText = await navigator.clipboard.readText();
+        await this.handlePastedContent(clipboardText);
+      } catch (error) {
+        console.log("Could not read clipboard:", error);
+        // Fallback to event clipboardData if clipboard API fails
+        const clipboardText = e.clipboardData?.getData("text/plain");
+        if (clipboardText) {
+          await this.handlePastedContent(clipboardText);
+        }
+      }
+    });
+  }
+
+  async handlePastedContent(content) {
+    if (!content || !content.trim()) return;
+
+    // Check if the content is a valid URL
+    if (this.isValidUrl(content.trim())) {
+      const url = content.trim();
+      let title = "";
+
+      // Try to extract title from URL
+      try {
+        const hostname = new URL(url).hostname;
+        title = hostname.replace("www.", "");
+        title = title.charAt(0).toUpperCase() + title.slice(1);
+      } catch (e) {
+        title = "Bookmark";
+      }
+
+      // Show the add bookmark modal with pre-filled URL
+      this.showAddBookmarkModal();
+      document.getElementById("bookmarkUrl").value = url;
+      document.getElementById("bookmarkTitle").value = title;
+
+      // Trigger favicon loading for the pasted URL
+      this.handleUrlInputChange(url);
+
+      document.getElementById("bookmarkTitle").focus();
+      document.getElementById("bookmarkTitle").select();
+    } else {
+      // Check if content contains a URL within text (like "Check out https://example.com")
+      const urlMatch = content.match(/(https?:\/\/[^\s]+)/i);
+      if (urlMatch) {
+        const url = urlMatch[1];
+        const title =
+          content.replace(urlMatch[0], "").trim() ||
+          this.extractTitleFromUrl(url);
+
+        this.showAddBookmarkModal();
+        document.getElementById("bookmarkUrl").value = url;
+        document.getElementById("bookmarkTitle").value = title;
+
+        // Trigger favicon loading for the extracted URL
+        this.handleUrlInputChange(url);
+
+        document.getElementById("bookmarkTitle").focus();
+        document.getElementById("bookmarkTitle").select();
+      }
+    }
+  }
+
+  extractTitleFromUrl(url) {
+    try {
+      const hostname = new URL(url).hostname;
+      let title = hostname.replace("www.", "");
+      return title.charAt(0).toUpperCase() + title.slice(1);
+    } catch (e) {
+      return "Bookmark";
+    }
+  }
+
+  setupDragAndDrop() {
+    const body = document.body;
+    let dragCounter = 0;
+
+    // Prevent default drag behaviors on document
+    ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+      document.addEventListener(
+        eventName,
+        (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        },
+        false,
+      );
+    });
+
+    // Handle drag enter
+    body.addEventListener("dragenter", (e) => {
+      e.preventDefault();
+
+      // Only show overlay for external drags (not internal bookmark reordering)
+      if (!this.isDragging) {
+        dragCounter++;
+
+        // Add a visual overlay to indicate drop zone (excluding header)
+        if (!document.getElementById("dropOverlay")) {
+          const header = document.querySelector("header");
+          const headerHeight = header ? header.offsetHeight : 0;
+
+          const overlay = document.createElement("div");
+          overlay.id = "dropOverlay";
+          overlay.className =
+            "fixed left-0 right-0 bottom-0 bg-blue-100/10 backdrop-blur-sm border-4 border-dashed border-blue-400 z-40 flex items-center justify-center";
+          overlay.style.top = `${headerHeight}px`; // Start exactly at bottom of header
+          overlay.innerHTML =
+            '<div class="text-blue-600 text-xl font-semibold">Drop bookmark here</div>';
+          body.appendChild(overlay);
+        }
+      }
+    });
+
+    // Handle drag over (required for drop to work)
+    body.addEventListener("dragover", (e) => {
+      e.preventDefault();
+    });
+
+    // Handle drag leave
+    body.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+
+      // Only handle external drags
+      if (!this.isDragging) {
+        dragCounter--;
+
+        // Only remove overlay when all drag operations are done
+        if (dragCounter === 0) {
+          const overlay = document.getElementById("dropOverlay");
+          if (overlay) {
+            overlay.remove();
+          }
+        }
+      }
+    });
+
+    // Handle drop on entire page
+    body.addEventListener("drop", (e) => {
+      e.preventDefault();
+
+      // Only handle external drops (not internal bookmark reordering)
+      if (!this.isDragging) {
+        dragCounter = 0; // Reset counter on drop
+        const overlay = document.getElementById("dropOverlay");
+        if (overlay) {
+          overlay.remove();
+        }
+
+        // Get the dragged data - Chrome bookmarks provide multiple data formats
+        const url =
+          e.dataTransfer.getData("text/uri-list") ||
+          e.dataTransfer.getData("text/plain");
+
+        // Try to get the bookmark title from different data types
+        let title = "";
+
+        // Debug: log all available data types
+        console.log("Available data types:", e.dataTransfer.types);
+
+        // Try various data formats to get the bookmark name
+        const htmlData = e.dataTransfer.getData("text/html");
+        const plainText = e.dataTransfer.getData("text/plain");
+        const mozText = e.dataTransfer.getData("text/x-moz-text-internal");
+        const mozHtml = e.dataTransfer.getData("application/x-moz-nativehtml");
+
+        console.log("Data extraction:", {
+          htmlData,
+          plainText,
+          mozText,
+          mozHtml,
+          url,
+        });
+
+        // First priority: Extract title from HTML data (most reliable for bookmarks)
+        if (htmlData) {
+          const tempDiv = document.createElement("div");
+          tempDiv.innerHTML = htmlData;
+          const linkElement = tempDiv.querySelector("a");
+          if (
+            linkElement &&
+            linkElement.textContent &&
+            linkElement.textContent.trim() !== url &&
+            !linkElement.textContent.trim().startsWith("http")
+          ) {
+            title = linkElement.textContent.trim();
+          }
+        }
+
+        // Second priority: Use Mozilla-specific data formats
+        if (
+          !title &&
+          mozText &&
+          mozText !== url &&
+          !mozText.startsWith("http")
+        ) {
+          title = mozText.trim();
+        }
+
+        // Third priority: Use plain text if it's not a URL
+        if (
+          !title &&
+          plainText &&
+          plainText !== url &&
+          !plainText.startsWith("http")
+        ) {
+          title = plainText.trim();
+        }
+
+        if (url && this.isValidUrl(url)) {
+          this.addBookmarkFromDrop(title, url);
+        }
+      }
+    });
+  }
+
+  isValidUrl(string) {
+    try {
+      new URL(string);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  normalizeUrl(url) {
+    if (!url || !url.trim()) return url;
+
+    const trimmedUrl = url.trim();
+
+    // If it already has a protocol, return as is
+    if (trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://")) {
+      return trimmedUrl;
     }
 
-    async _syncCreateBookmark(bookmark) {
-        if (!api.isAuthenticated()) return;
-        try {
-            const oldId = bookmark.id;
-            // Use the bookmark's index in the local array as its position
-            const idx = this.bookmarks.findIndex(b => b.id === oldId);
-            const position = idx !== -1 ? idx : 0;
+    // If it looks like a URL (contains a dot and domain pattern), prefix with https://
+    if (trimmedUrl.includes(".") && /^[a-zA-Z0-9]/.test(trimmedUrl)) {
+      return "https://" + trimmedUrl;
+    }
 
-            const serverBookmark = await api.createBookmark({
-                title: bookmark.title,
-                url: bookmark.url,
-                favicon: bookmark.favicon || null,
-                folderId: bookmark.folderId,
-                position: position,
-            });
-            // Update local ID to match server-assigned ID
-            const currentIdx = this.bookmarks.findIndex(b => b.id === oldId);
-            if (currentIdx !== -1) {
-                this.bookmarks[currentIdx].id = serverBookmark.id;
-                // Also update currentBookmarkId if the edit modal is open for this bookmark
-                if (this.currentBookmarkId === oldId) {
-                    this.currentBookmarkId = serverBookmark.id;
-                }
-                if (this.duplicatedBookmarkId === oldId) {
-                    this.duplicatedBookmarkId = serverBookmark.id;
-                }
-                await this.saveBookmarks();
+    return trimmedUrl;
+  }
+
+  isValidUrlOrCanBeNormalized(string) {
+    if (!string || !string.trim()) return false;
+
+    // First check if it's already valid
+    if (this.isValidUrl(string)) return true;
+
+    // Then check if it can be normalized to a valid URL
+    const normalized = this.normalizeUrl(string);
+    return this.isValidUrl(normalized);
+  }
+
+  extractTitleFromDocument(doc) {
+    // Try different title sources in order of preference
+    const titleSources = [
+      'meta[property="og:title"]',
+      'meta[name="twitter:title"]',
+      "title",
+      "h1",
+    ];
+
+    for (const selector of titleSources) {
+      const element = doc.querySelector(selector);
+      if (element) {
+        const title =
+          element.getAttribute("content") || element.textContent || "";
+        const cleanTitle = title.trim();
+        if (cleanTitle) {
+          return cleanTitle;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  async getHighResolutionFavicon(url) {
+    const hostname = new URL(url).hostname;
+    const origin = new URL(url).origin;
+
+    // Check if we have a cached favicon for this domain
+    const cachedFavicon = await this.getCachedFavicon(hostname);
+    if (cachedFavicon) {
+      return cachedFavicon;
+    }
+
+    let faviconUrl = null;
+
+    // First try to parse HTML to find declared favicon links
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+
+        // Look for various favicon declarations in order of preference
+        const faviconSelectors = [
+          'link[rel*="icon"][sizes*="192"]',
+          'link[rel*="icon"][sizes*="180"]',
+          'link[rel*="icon"][sizes*="152"]',
+          'link[rel*="icon"][sizes*="144"]',
+          'link[rel*="icon"][sizes*="128"]',
+          'link[rel*="icon"][sizes*="96"]',
+          'link[rel*="icon"][sizes*="72"]',
+          'link[rel*="icon"][sizes*="64"]',
+          'link[rel*="icon"][sizes*="48"]',
+          'link[rel*="icon"][sizes*="32"]',
+          'link[rel="apple-touch-icon"]',
+          'link[rel="apple-touch-icon-precomposed"]',
+          'link[rel="icon"]',
+          'link[rel="shortcut icon"]',
+        ];
+
+        for (const selector of faviconSelectors) {
+          const link = doc.querySelector(selector);
+          if (link && link.href) {
+            const testUrl = new URL(link.href, url).href;
+            // Test if the favicon actually exists and download it
+            const cachedData = await this.downloadAndCacheFavicon(
+              hostname,
+              testUrl,
+            );
+            if (cachedData) {
+              return cachedData;
             }
-            // Re-sync all positions so there are no conflicts
-            await this._syncAllPositions();
-        } catch (e) {
-            console.log('Background sync (create bookmark) failed:', e.message);
+          }
         }
+      }
+    } catch (e) {
+      // If HTML parsing fails, fall back to hardcoded paths
     }
 
-    async _syncAllPositions() {
-        if (!api.isAuthenticated()) return;
-        try {
-            const items = this.bookmarks
-                .map((b, i) => ({ id: b.id, position: i }));
-            // Also include folders
-            const folderItems = this.folders
-                .map((f, i) => ({ id: f.id, position: i + this.bookmarks.length }));
-            const allItems = [...items, ...folderItems];
-            if (allItems.length > 0) {
-                await api.reorderItems(allItems);
+    // Fallback to common favicon paths
+    const faviconSources = [
+      `${origin}/apple-touch-icon.png`,
+      `${origin}/apple-touch-icon-180x180.png`,
+      `${origin}/apple-touch-icon-152x152.png`,
+      `${origin}/apple-touch-icon-144x144.png`,
+      `${origin}/apple-touch-icon-120x120.png`,
+      `${origin}/android-chrome-192x192.png`,
+      `${origin}/favicon-196x196.png`,
+      `${origin}/favicon-128x128.png`,
+      `${origin}/favicon-96x96.png`,
+      `${origin}/favicon-64x64.png`,
+      `${origin}/favicon-32x32.png`,
+      `${origin}/favicon.png`,
+      `${origin}/favicon.ico`,
+    ];
+
+    for (const testUrl of faviconSources) {
+      const cachedData = await this.downloadAndCacheFavicon(hostname, testUrl);
+      if (cachedData) {
+        return cachedData;
+      }
+    }
+
+    // If no favicon found, return null (no fallback)
+    return null;
+  }
+
+  async testFaviconUrl(url) {
+    try {
+      const response = await fetch(url, {
+        method: "HEAD",
+        mode: "no-cors",
+      });
+      return response.ok || response.type === "opaque";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async getCachedFavicon(hostname) {
+    try {
+      const result = await chrome.storage.local.get(["faviconCache"]);
+      const cache = result.faviconCache || {};
+      return cache[hostname] || null;
+    } catch (e) {
+      console.log("Failed to get cached favicon:", e);
+      return null;
+    }
+  }
+
+  async downloadAndCacheFavicon(hostname, faviconUrl) {
+    try {
+      const response = await fetch(faviconUrl);
+      if (!response.ok) {
+        return null;
+      }
+
+      const blob = await response.blob();
+
+      // Check if it's a valid image
+      if (!blob.type.startsWith("image/")) {
+        return null;
+      }
+
+      // Convert to base64 data URL
+      const base64Data = await this.blobToBase64(blob);
+
+      // Cache the favicon
+      await this.cacheFavicon(hostname, base64Data);
+
+      return base64Data;
+    } catch (e) {
+      console.log("Failed to download favicon:", e);
+      return null;
+    }
+  }
+
+  async blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async cacheFavicon(hostname, base64Data) {
+    try {
+      const result = await chrome.storage.local.get(["faviconCache"]);
+      const cache = result.faviconCache || {};
+      cache[hostname] = base64Data;
+
+      // Limit cache size by removing old entries if needed
+      const cacheKeys = Object.keys(cache);
+      if (cacheKeys.length > 100) {
+        // Remove the oldest 20 entries (simple cleanup)
+        cacheKeys.slice(0, 20).forEach((key) => delete cache[key]);
+      }
+
+      await chrome.storage.local.set({ faviconCache: cache });
+    } catch (e) {
+      console.log("Failed to cache favicon:", e);
+    }
+  }
+
+  async cleanupUnusedFavicons() {
+    try {
+      const result = await chrome.storage.local.get(["faviconCache"]);
+      const cache = result.faviconCache || {};
+
+      // Get all hostnames currently used by bookmarks
+      const usedHostnames = new Set();
+      for (const bookmark of this.bookmarks) {
+        if (bookmark.url) {
+          try {
+            const hostname = new URL(bookmark.url).hostname;
+            usedHostnames.add(hostname);
+          } catch (e) {
+            // Invalid URL, skip
+          }
+        }
+      }
+
+      // Remove cached favicons for hostnames no longer used
+      const cacheKeys = Object.keys(cache);
+      let removed = 0;
+      for (const hostname of cacheKeys) {
+        if (!usedHostnames.has(hostname)) {
+          delete cache[hostname];
+          removed++;
+        }
+      }
+
+      if (removed > 0) {
+        await chrome.storage.local.set({ faviconCache: cache });
+        console.log(`Cleaned up ${removed} unused favicons from cache`);
+      }
+    } catch (e) {
+      console.log("Failed to cleanup favicon cache:", e);
+    }
+  }
+
+  async addBookmarkFromDrop(title, url) {
+    // Use the provided bookmark title if available, otherwise extract from URL
+    let bookmarkTitle = title;
+    if (
+      !title ||
+      title.trim() === "" ||
+      title === url ||
+      title.startsWith("http")
+    ) {
+      try {
+        const hostname = new URL(url).hostname;
+        bookmarkTitle = hostname.replace("www.", "");
+        bookmarkTitle =
+          bookmarkTitle.charAt(0).toUpperCase() + bookmarkTitle.slice(1);
+      } catch (e) {
+        bookmarkTitle = "Bookmark";
+      }
+    }
+
+    // Show the add bookmark modal with pre-filled data
+    this.showAddBookmarkModal();
+    document.getElementById("bookmarkTitle").value = bookmarkTitle;
+    document.getElementById("bookmarkUrl").value = url;
+
+    // Trigger favicon loading for the dropped URL
+    this.handleUrlInputChange(url);
+
+    // Focus the title field and select the text for easy editing
+    setTimeout(() => {
+      const titleInput = document.getElementById("bookmarkTitle");
+      titleInput.focus();
+      titleInput.select();
+    }, 100);
+  }
+
+  async loadBookmarks() {
+    // Always load from local storage (fast, offline-first)
+    try {
+      const result = await chrome.storage.local.get(["bookmarks", "folders"]);
+      this.bookmarks = result.bookmarks || (await this.getDefaultBookmarks());
+      this.folders = result.folders || [];
+      console.log("Loaded bookmarks from local storage");
+    } catch (error) {
+      console.log("Error loading from local storage:", error.message);
+      this.bookmarks = await this.getDefaultBookmarks();
+      this.folders = [];
+    }
+  }
+
+  async getDefaultBookmarks() {
+    const defaultUrls = [
+      { title: "Google", url: "https://www.google.com" },
+      { title: "GitHub", url: "https://github.com" },
+      { title: "Stack Overflow", url: "https://stackoverflow.com" },
+      { title: "YouTube", url: "https://www.youtube.com" },
+    ];
+
+    const bookmarks = [];
+    for (let i = 0; i < defaultUrls.length; i++) {
+      const { title, url } = defaultUrls[i];
+      const favicon = await this.getHighResolutionFavicon(url);
+      bookmarks.push({
+        id: Date.now() + i + 1,
+        title,
+        url,
+        favicon,
+        dateAdded: new Date().toISOString(),
+        folderId: null,
+      });
+    }
+
+    return bookmarks;
+  }
+
+  async saveBookmarks() {
+    // Always persist to local storage (primary source of truth)
+    try {
+      this._localSaveInProgress = true;
+      await chrome.storage.local.set({
+        bookmarks: this.bookmarks,
+        folders: this.folders,
+      });
+    } catch (error) {
+      console.error("Error saving bookmarks to local storage:", error);
+    } finally {
+      this._localSaveInProgress = false;
+    }
+  }
+
+  showAddBookmarkModal() {
+    document.getElementById("addBookmarkModal").classList.remove("hidden");
+
+    // Show favicon selection UI immediately with empty state
+    const faviconSelection = document.getElementById("faviconSelection");
+    const faviconOptions = document.getElementById("faviconOptions");
+    faviconSelection.classList.remove("hidden");
+    faviconOptions.innerHTML =
+      '<div class="text-sm text-gray-500 col-span-6 text-center">Enter a URL to load favicon options</div>';
+
+    document.getElementById("bookmarkTitle").focus();
+  }
+
+  hideAddBookmarkModal() {
+    document.getElementById("addBookmarkModal").classList.add("hidden");
+    document.getElementById("addBookmarkForm").reset();
+    document.getElementById("faviconSelection").classList.add("hidden");
+    this.selectedFavicon = null;
+    if (this.faviconDebounceTimer) {
+      clearTimeout(this.faviconDebounceTimer);
+    }
+  }
+
+  handleUrlInputChange(url) {
+    if (this.faviconDebounceTimer) {
+      clearTimeout(this.faviconDebounceTimer);
+    }
+
+    if (!url || !this.isValidUrlOrCanBeNormalized(url)) {
+      document.getElementById("faviconSelection").classList.add("hidden");
+      this.selectedFavicon = null;
+      return;
+    }
+
+    // Show favicon selection UI immediately
+    const faviconSelection = document.getElementById("faviconSelection");
+    const faviconOptions = document.getElementById("faviconOptions");
+    faviconSelection.classList.remove("hidden");
+    faviconOptions.innerHTML =
+      '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
+
+    this.faviconDebounceTimer = setTimeout(() => {
+      const normalizedUrl = this.normalizeUrl(url);
+
+      // Update the input field with the normalized URL if it changed
+      if (normalizedUrl !== url) {
+        document.getElementById("bookmarkUrl").value = normalizedUrl;
+      }
+
+      this.loadFaviconOptions(normalizedUrl);
+    }, 500);
+  }
+
+  handleEditUrlInputChange(url) {
+    if (this.editFaviconDebounceTimer) {
+      clearTimeout(this.editFaviconDebounceTimer);
+    }
+
+    if (!url || !this.isValidUrlOrCanBeNormalized(url)) {
+      document.getElementById("editFaviconSelection").classList.add("hidden");
+      this.selectedEditFavicon = null;
+      return;
+    }
+
+    // Show favicon selection UI immediately
+    const faviconSelection = document.getElementById("editFaviconSelection");
+    const faviconOptions = document.getElementById("editFaviconOptions");
+    faviconSelection.classList.remove("hidden");
+    faviconOptions.innerHTML =
+      '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
+
+    this.editFaviconDebounceTimer = setTimeout(() => {
+      const normalizedUrl = this.normalizeUrl(url);
+
+      // Update the input field with the normalized URL if it changed
+      if (normalizedUrl !== url) {
+        document.getElementById("editBookmarkUrl").value = normalizedUrl;
+      }
+
+      this.loadEditFaviconOptions(normalizedUrl);
+    }, 500);
+  }
+
+  async loadFaviconOptions(url) {
+    const faviconSelection = document.getElementById("faviconSelection");
+    const faviconOptions = document.getElementById("faviconOptions");
+
+    faviconSelection.classList.remove("hidden");
+    faviconOptions.innerHTML =
+      '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
+
+    try {
+      const result = await this.getAllFaviconUrlsAndTitle(url);
+      this.displayFaviconOptions(result.faviconUrls);
+
+      // Auto-fill title if it's empty and we extracted a title
+      const titleInput = document.getElementById("bookmarkTitle");
+      if (
+        result.pageTitle &&
+        (!titleInput.value || titleInput.value.trim() === "")
+      ) {
+        titleInput.value = result.pageTitle;
+      }
+    } catch (error) {
+      faviconOptions.innerHTML =
+        '<div class="text-sm text-red-500 col-span-6 text-center">Failed to load favicon options</div>';
+    }
+  }
+
+  async loadEditFaviconOptions(url) {
+    const faviconSelection = document.getElementById("editFaviconSelection");
+    const faviconOptions = document.getElementById("editFaviconOptions");
+
+    faviconSelection.classList.remove("hidden");
+    faviconOptions.innerHTML =
+      '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
+
+    try {
+      const result = await this.getAllFaviconUrlsAndTitle(url);
+      this.displayEditFaviconOptions(result.faviconUrls);
+
+      // Auto-fill title if it's empty and we extracted a title
+      const titleInput = document.getElementById("editBookmarkTitle");
+      if (
+        result.pageTitle &&
+        (!titleInput.value || titleInput.value.trim() === "")
+      ) {
+        titleInput.value = result.pageTitle;
+      }
+    } catch (error) {
+      faviconOptions.innerHTML =
+        '<div class="text-sm text-red-500 col-span-6 text-center">Failed to load favicon options</div>';
+    }
+  }
+
+  async getAllFaviconUrls(url) {
+    const result = await this.getAllFaviconUrlsAndTitle(url);
+    return result.faviconUrls;
+  }
+
+  async getAllFaviconUrlsAndTitle(url) {
+    const hostname = new URL(url).hostname;
+    const origin = new URL(url).origin;
+    const faviconUrls = [];
+    let pageTitle = null;
+
+    // Check if we have a cached favicon for this domain
+    const cachedFavicon = await this.getCachedFavicon(hostname);
+    if (cachedFavicon) {
+      faviconUrls.push({
+        url: cachedFavicon,
+        label: "Cached Favicon",
+      });
+    }
+
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+
+        // Extract page title
+        pageTitle = this.extractTitleFromDocument(doc);
+
+        const faviconSelectors = [
+          'link[rel*="icon"][sizes*="192"]',
+          'link[rel*="icon"][sizes*="180"]',
+          'link[rel*="icon"][sizes*="152"]',
+          'link[rel*="icon"][sizes*="144"]',
+          'link[rel*="icon"][sizes*="128"]',
+          'link[rel*="icon"][sizes*="96"]',
+          'link[rel="apple-touch-icon"]',
+          'link[rel="apple-touch-icon-precomposed"]',
+          'link[rel="icon"]',
+          'link[rel="shortcut icon"]',
+        ];
+
+        for (const selector of faviconSelectors) {
+          const links = doc.querySelectorAll(selector);
+          for (const link of links) {
+            if (link.href) {
+              const faviconUrl = new URL(link.href, url).href;
+              const sizes = link.getAttribute("sizes") || "unspecified";
+              faviconUrls.push({
+                url: faviconUrl,
+                label: `${link.rel} (${sizes})`,
+              });
             }
-        } catch (e) {
-            console.log('Background sync (positions) failed:', e.message);
+          }
         }
+      }
+    } catch (e) {
+      console.log("Could not parse HTML for favicons");
     }
 
+    // Add alternative favicon services (these work better for authentication-protected sites)
+    const alternativeSources = [
+      {
+        url: `https://icons.duckduckgo.com/ip3/${hostname}.ico`,
+        label: "DuckDuckGo Favicon",
+      },
+      {
+        url: `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`,
+        label: "Google Favicon (64px)",
+      },
+    ];
 
+    for (const { url: faviconUrl, label } of alternativeSources) {
+      faviconUrls.push({
+        url: faviconUrl,
+        label: label,
+      });
+    }
 
-    // Remove setView method since we only have favicon view now
+    // Add common favicon paths
+    const commonPaths = [
+      { path: "/apple-touch-icon.png", label: "Apple Touch Icon" },
+      { path: "/favicon-192x192.png", label: "Android Chrome 192x192" },
+      { path: "/favicon-96x96.png", label: "Favicon 96x96" },
+      { path: "/favicon-32x32.png", label: "Favicon 32x32" },
+      { path: "/favicon.ico", label: "Classic Favicon" },
+    ];
 
-    renderQuickAccess() {
-        const quickAccessContainer = document.getElementById('quickAccess');
-        
-        // Always show main view bookmarks (those not in folders) in the main area
-        // The openFolderId is only used for the folder modal, not the main view
-        const visibleBookmarks = this.bookmarks.filter(b => !b.folderId);
-        
-        // Render folder tiles (always show in main view)
-        const folderTiles = this.folders.map(folder => {
-            const paddingClass = this.settings.showTitles ? 'pt-2 px-4 pb-6' : 'p-4';
-            
-            return `
+    for (const { path, label } of commonPaths) {
+      faviconUrls.push({
+        url: `${origin}${path}`,
+        label: label,
+      });
+    }
+
+    // Remove duplicates
+    const uniqueUrls = [];
+    const seenUrls = new Set();
+    for (const favicon of faviconUrls) {
+      if (!seenUrls.has(favicon.url)) {
+        seenUrls.add(favicon.url);
+        uniqueUrls.push(favicon);
+      }
+    }
+
+    return {
+      faviconUrls: uniqueUrls,
+      pageTitle: pageTitle,
+    };
+  }
+
+  async displayFaviconOptions(faviconUrls) {
+    const faviconOptions = document.getElementById("faviconOptions");
+
+    if (faviconUrls.length === 0) {
+      faviconOptions.innerHTML =
+        '<div class="text-sm text-gray-500 col-span-6 text-center">No favicon options found</div>';
+      return;
+    }
+
+    faviconOptions.innerHTML = "";
+
+    for (let i = 0; i < faviconUrls.length; i++) {
+      const favicon = faviconUrls[i];
+      const faviconElement = document.createElement("div");
+      faviconElement.className =
+        "favicon-option w-10 h-10 border border-gray-300 rounded cursor-pointer hover:border-blue-500 flex items-center justify-center bg-white transition-colors";
+      faviconElement.title = favicon.label;
+      faviconElement.dataset.faviconUrl = favicon.url;
+
+      const img = document.createElement("img");
+      img.src = favicon.url;
+      img.className = "w-8 h-8 rounded";
+      img.style.display = "block";
+
+      const fallback = document.createElement("div");
+      fallback.className =
+        "w-8 h-8 bg-gray-300 rounded flex items-center justify-center text-xs text-gray-600";
+      fallback.textContent = "?";
+      fallback.style.display = "none";
+
+      img.onerror = () => {
+        img.style.display = "none";
+        fallback.style.display = "flex";
+        // Mark this favicon as problematic
+        faviconElement.classList.add("favicon-error");
+        faviconElement.title = favicon.label + " (failed to load)";
+      };
+
+      faviconElement.appendChild(img);
+      faviconElement.appendChild(fallback);
+
+      faviconElement.addEventListener("click", async () => {
+        await this.selectFavicon(faviconElement, favicon.url);
+      });
+
+      faviconOptions.appendChild(faviconElement);
+
+      // Auto-select first option
+      if (i === 0) {
+        await this.selectFavicon(faviconElement, favicon.url);
+      }
+    }
+  }
+
+  async displayEditFaviconOptions(faviconUrls) {
+    const faviconOptions = document.getElementById("editFaviconOptions");
+
+    if (faviconUrls.length === 0) {
+      faviconOptions.innerHTML =
+        '<div class="text-sm text-gray-500 col-span-6 text-center">No favicon options found</div>';
+      return;
+    }
+
+    faviconOptions.innerHTML = "";
+
+    for (let i = 0; i < faviconUrls.length; i++) {
+      const favicon = faviconUrls[i];
+      const faviconElement = document.createElement("div");
+      faviconElement.className =
+        "edit-favicon-option w-10 h-10 border border-gray-300 rounded cursor-pointer hover:border-blue-500 flex items-center justify-center bg-white transition-colors";
+      faviconElement.title = favicon.label;
+      faviconElement.dataset.faviconUrl = favicon.url;
+
+      const img = document.createElement("img");
+      img.src = favicon.url;
+      img.className = "w-8 h-8 rounded";
+      img.style.display = "block";
+
+      const fallback = document.createElement("div");
+      fallback.className =
+        "w-8 h-8 bg-gray-300 rounded flex items-center justify-center text-xs text-gray-600";
+      fallback.textContent = "?";
+      fallback.style.display = "none";
+
+      img.onerror = () => {
+        img.style.display = "none";
+        fallback.style.display = "flex";
+        // Mark this favicon as problematic
+        faviconElement.classList.add("favicon-error");
+        faviconElement.title = favicon.label + " (failed to load)";
+      };
+
+      faviconElement.appendChild(img);
+      faviconElement.appendChild(fallback);
+
+      faviconElement.addEventListener("click", async () => {
+        await this.selectEditFavicon(faviconElement, favicon.url);
+      });
+
+      faviconOptions.appendChild(faviconElement);
+
+      // Auto-select first option
+      if (i === 0) {
+        await this.selectEditFavicon(faviconElement, favicon.url);
+      }
+    }
+  }
+
+  async selectFavicon(element, url) {
+    // Remove previous selection
+    const currentSelected = document.querySelector(".favicon-option.selected");
+    if (currentSelected) {
+      currentSelected.classList.remove(
+        "selected",
+        "border-blue-500",
+        "bg-blue-50",
+      );
+      currentSelected.classList.add("border-gray-300", "bg-white");
+      currentSelected.style.borderWidth = "1px";
+    }
+
+    // Add selection to new element
+    element.classList.remove("border-gray-300", "bg-white");
+    element.classList.add("selected", "border-blue-500", "bg-blue-50");
+    element.style.borderWidth = "2px";
+
+    // If this is not already a cached favicon (base64 data URL), cache it
+    if (!url.startsWith("data:")) {
+      const normalizedUrl = this.normalizeUrl(
+        document.getElementById("bookmarkUrl").value,
+      );
+      const hostname = new URL(normalizedUrl).hostname;
+      const cachedData = await this.downloadAndCacheFavicon(hostname, url);
+      if (cachedData) {
+        this.selectedFavicon = cachedData;
+      } else {
+        this.selectedFavicon = null; // Don't use external URL if caching fails
+      }
+    } else {
+      this.selectedFavicon = url;
+    }
+  }
+
+  async selectEditFavicon(element, url) {
+    // Remove previous selection
+    const currentSelected = document.querySelector(
+      ".edit-favicon-option.selected",
+    );
+    if (currentSelected) {
+      currentSelected.classList.remove(
+        "selected",
+        "border-blue-500",
+        "bg-blue-50",
+      );
+      currentSelected.classList.add("border-gray-300", "bg-white");
+      currentSelected.style.borderWidth = "1px";
+    }
+
+    // Add selection to new element
+    element.classList.remove("border-gray-300", "bg-white");
+    element.classList.add("selected", "border-blue-500", "bg-blue-50");
+    element.style.borderWidth = "2px";
+
+    // If this is not already a cached favicon (base64 data URL), cache it
+    if (!url.startsWith("data:")) {
+      const normalizedUrl = this.normalizeUrl(
+        document.getElementById("editBookmarkUrl").value,
+      );
+      const hostname = new URL(normalizedUrl).hostname;
+      const cachedData = await this.downloadAndCacheFavicon(hostname, url);
+      if (cachedData) {
+        this.selectedEditFavicon = cachedData;
+      } else {
+        this.selectedEditFavicon = null; // Don't use external URL if caching fails
+      }
+    } else {
+      this.selectedEditFavicon = url;
+    }
+  }
+
+  async addBookmark() {
+    const title = document.getElementById("bookmarkTitle").value.trim();
+    const rawUrl = document.getElementById("bookmarkUrl").value.trim();
+    const url = this.normalizeUrl(rawUrl);
+
+    if (!title || !url) return;
+
+    const favicon = this.selectedFavicon || "";
+    const faviconWasSelected = !!this.selectedFavicon;
+
+    const now = new Date().toISOString();
+    const bookmark = {
+      id: Date.now(),
+      title,
+      url,
+      favicon,
+      dateAdded: now,
+      folderId: null,
+      lastUpdated: now,
+      position: 0,
+    };
+
+    this.bookmarks.unshift(bookmark);
+    // Update positions for all bookmarks
+    this.bookmarks.forEach((b, i) => {
+      b.position = i;
+    });
+    await this.saveBookmarks();
+    this.renderQuickAccess();
+    this.hideAddBookmarkModal();
+
+    // Only update favicon async if no favicon was selected
+    if (!faviconWasSelected) {
+      this.updateFaviconAsync(bookmark.id, url);
+    }
+
+    // Enqueue sync
+    enqueueSync("create_bookmark", {
+      localId: bookmark.id,
+      title: bookmark.title,
+      url: bookmark.url,
+      favicon: bookmark.favicon || null,
+      folderId: bookmark.folderId,
+      position: 0,
+    });
+  }
+
+  // Remove setView method since we only have favicon view now
+
+  renderQuickAccess() {
+    const quickAccessContainer = document.getElementById("quickAccess");
+
+    // Always show main view bookmarks (those not in folders) in the main area
+    // The openFolderId is only used for the folder modal, not the main view
+    const visibleBookmarks = this.bookmarks.filter((b) => !b.folderId);
+
+    // Render folder tiles (always show in main view)
+    const folderTiles = this.folders
+      .map((folder) => {
+        const paddingClass = this.settings.showTitles
+          ? "pt-2 px-4 pb-6"
+          : "p-4";
+
+        return `
             <div class="tile tile-3d tile-3d-folder w-24 h-24 relative rounded-lg cursor-pointer" 
                  data-folder-id="${folder.id}" 
                  draggable="false"
@@ -1515,38 +1529,51 @@ class BookmarkManager {
                         </svg>
                     </div>
                 </div>
-                ${this.settings.showTitles ? `
+                ${
+                  this.settings.showTitles
+                    ? `
                 <div class="tile-title absolute bottom-1 left-1 right-1">
                     <span class="text-xs text-gray-800 text-center block truncate">${folder.name}</span>
-                </div>` : ''}
+                </div>`
+                    : ""
+                }
             </div>
         `;
-        }).join('');
-        
-        const bookmarkTiles = visibleBookmarks.map(bookmark => {
-            const paddingClass = this.settings.showTitles ? 'pt-2 px-4 pb-6' : 'p-4';
-            
-            return `
+      })
+      .join("");
+
+    const bookmarkTiles = visibleBookmarks
+      .map((bookmark) => {
+        const paddingClass = this.settings.showTitles
+          ? "pt-2 px-4 pb-6"
+          : "p-4";
+
+        return `
             <div class="tile tile-3d tile-3d-bookmark w-24 h-24 relative rounded-lg cursor-pointer" 
                  data-bookmark-id="${bookmark.id}" 
                  draggable="true"
                  title="${bookmark.title}">
                 <a draggable="false" href="${bookmark.url}" aria-label="${bookmark.title}" class="absolute inset-0"></a>
                 <div class="tile-icon absolute inset-0 flex items-center justify-center ${paddingClass}">
-                    <img draggable="false" alt="" src="${bookmark.favicon}" class="w-full h-full rounded-lg object-cover bookmark-favicon" style="display: ${bookmark.favicon ? 'block' : 'none'};">
-                    <div class="w-full h-full bg-blue-500 rounded-lg flex items-center justify-center text-white text-2xl font-bold bookmark-fallback" style="display: ${bookmark.favicon ? 'none' : 'block'};">
+                    <img draggable="false" alt="" src="${bookmark.favicon}" class="w-full h-full rounded-lg object-cover bookmark-favicon" style="display: ${bookmark.favicon ? "block" : "none"};">
+                    <div class="w-full h-full bg-blue-500 rounded-lg flex items-center justify-center text-white text-2xl font-bold bookmark-fallback" style="display: ${bookmark.favicon ? "none" : "block"};">
                         ${bookmark.title.charAt(0).toUpperCase()}
                     </div>
                 </div>
-                ${this.settings.showTitles ? `
+                ${
+                  this.settings.showTitles
+                    ? `
                 <div class="tile-title absolute bottom-1 left-1 right-1">
                     <span class="text-xs text-gray-800 text-center block truncate">${bookmark.title}</span>
-                </div>` : ''}
+                </div>`
+                    : ""
+                }
             </div>
         `;
-        }).join('');
+      })
+      .join("");
 
-        const addButtonTile = `
+    const addButtonTile = `
             <div id="addBookmarkTile" class="tile tile-3d tile-3d-add w-24 h-24 relative rounded-lg cursor-pointer" 
                  title="Add New Bookmark">
                 <div class="absolute inset-0 flex items-center justify-center">
@@ -1555,1188 +1582,1280 @@ class BookmarkManager {
             </div>
         `;
 
-        quickAccessContainer.innerHTML = folderTiles + bookmarkTiles + (this.settings.showAddButton ? addButtonTile : '');
-        
-        // Add event listeners for bookmark clicks and right-clicks
-        visibleBookmarks.forEach(bookmark => {
-            const bookmarkElement = quickAccessContainer.querySelector(`[data-bookmark-id="${bookmark.id}"]`);
-            if (!bookmarkElement) return; // Skip if element not found
-            
-            // Left click - navigate to URL (only if not dragging)
-            bookmarkElement.addEventListener('click', (e) => {
-                if (e.button === 0 && !this.isDragging) { // Left click and not dragging
-                    window.location.href = bookmark.url;
-                }
-            });
-            
-            // Middle click - open in new background tab
-            bookmarkElement.addEventListener('mousedown', (e) => {
-                if (e.button === 1 && !this.isDragging) { // Middle click and not dragging
-                    e.preventDefault();
-                    chrome.tabs.create({ url: bookmark.url, active: false });
-                }
-            });
-            
-            // Right click - show context menu
-            bookmarkElement.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                this.showContextMenu(e, bookmark.id);
-            });
+    quickAccessContainer.innerHTML =
+      folderTiles +
+      bookmarkTiles +
+      (this.settings.showAddButton ? addButtonTile : "");
 
-            // Drag start
-            bookmarkElement.addEventListener('dragstart', (e) => {
-                this.isDragging = true;
-                this.draggedBookmarkId = bookmark.id;
-                bookmarkElement.style.opacity = '0.5';
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/html', bookmarkElement.outerHTML);
-            });
+    // Add event listeners for bookmark clicks and right-clicks
+    visibleBookmarks.forEach((bookmark) => {
+      const bookmarkElement = quickAccessContainer.querySelector(
+        `[data-bookmark-id="${bookmark.id}"]`,
+      );
+      if (!bookmarkElement) return; // Skip if element not found
 
-            // Drag end
-            bookmarkElement.addEventListener('dragend', (e) => {
-                this.isDragging = false;
-                this.draggedBookmarkId = null;
-                bookmarkElement.style.opacity = '1';
-                this.removeDragIndicator();
-            });
-
-            // Drag over - show drop indicator
-            bookmarkElement.addEventListener('dragover', (e) => {
-                if (this.draggedBookmarkId && this.draggedBookmarkId !== bookmark.id) {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = 'move';
-                    this.showDragIndicator(bookmarkElement, e);
-                }
-            });
-
-            // Drop - reorder bookmarks
-            bookmarkElement.addEventListener('drop', (e) => {
-                if (this.draggedBookmarkId && this.draggedBookmarkId !== bookmark.id) {
-                    e.preventDefault();
-                    this.reorderBookmarks(this.draggedBookmarkId, bookmark.id, e);
-                    this.removeDragIndicator();
-                }
-            });
-
-            // Handle favicon error - show fallback
-            const faviconImg = bookmarkElement.querySelector('.bookmark-favicon');
-            const fallbackDiv = bookmarkElement.querySelector('.bookmark-fallback');
-            
-            faviconImg.addEventListener('error', () => {
-                faviconImg.style.display = 'none';
-                fallbackDiv.style.display = 'block';
-            });
-        });
-
-        // Add event listeners for folder tiles
-        this.folders.forEach(folder => {
-            const folderElement = quickAccessContainer.querySelector(`[data-folder-id="${folder.id}"]`);
-            if (folderElement) {
-                // Left click - open folder
-                folderElement.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.openFolder(folder.id);
-                });
-                
-                // Right click - show folder context menu
-                folderElement.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    this.showFolderContextMenu(e, folder.id);
-                });
-
-                // Drag over - accept bookmarks
-                folderElement.addEventListener('dragover', (e) => {
-                    if (this.draggedBookmarkId && !this.openFolderId) {
-                        e.preventDefault();
-                        e.dataTransfer.dropEffect = 'move';
-                        folderElement.classList.add('bg-amber-200', 'border-amber-400');
-                    }
-                });
-
-                // Drag leave - remove drop indicator
-                folderElement.addEventListener('dragleave', (e) => {
-                    folderElement.classList.remove('bg-amber-200', 'border-amber-400');
-                });
-
-                // Drop - move bookmark to folder
-                folderElement.addEventListener('drop', (e) => {
-                    if (this.draggedBookmarkId && !this.openFolderId) {
-                        e.preventDefault();
-                        this.moveBookmarkToFolder(this.draggedBookmarkId, folder.id);
-                        folderElement.classList.remove('bg-amber-200', 'border-amber-400');
-                    }
-                });
-            }
-        });
-
-        // Add event listener for the add bookmark tile
-        const addBookmarkTile = quickAccessContainer.querySelector('#addBookmarkTile');
-        if (addBookmarkTile) {
-            addBookmarkTile.addEventListener('click', () => {
-                this.showAddBookmarkModal();
-            });
+      // Left click - navigate to URL (only if not dragging)
+      bookmarkElement.addEventListener("click", (e) => {
+        if (e.button === 0 && !this.isDragging) {
+          // Left click and not dragging
+          window.location.href = bookmark.url;
         }
-    }
+      });
 
-    showDragIndicator(targetElement, event) {
+      // Middle click - open in new background tab
+      bookmarkElement.addEventListener("mousedown", (e) => {
+        if (e.button === 1 && !this.isDragging) {
+          // Middle click and not dragging
+          e.preventDefault();
+          chrome.tabs.create({ url: bookmark.url, active: false });
+        }
+      });
+
+      // Right click - show context menu
+      bookmarkElement.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        this.showContextMenu(e, bookmark.id);
+      });
+
+      // Drag start
+      bookmarkElement.addEventListener("dragstart", (e) => {
+        this.isDragging = true;
+        this.draggedBookmarkId = bookmark.id;
+        bookmarkElement.style.opacity = "0.5";
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/html", bookmarkElement.outerHTML);
+      });
+
+      // Drag end
+      bookmarkElement.addEventListener("dragend", (e) => {
+        this.isDragging = false;
+        this.draggedBookmarkId = null;
+        bookmarkElement.style.opacity = "1";
         this.removeDragIndicator();
-        
-        const rect = targetElement.getBoundingClientRect();
-        const midPoint = rect.left + rect.width / 2;
-        const isRightSide = event.clientX > midPoint;
-        
-        const indicator = document.createElement('div');
-        indicator.id = 'dragIndicator';
-        indicator.className = 'absolute top-0 bottom-0 w-1 bg-blue-500 z-50 rounded-full';
-        indicator.style.height = `${rect.height}px`;
-        
-        if (isRightSide) {
-            indicator.style.left = `${rect.right}px`;
-        } else {
-            indicator.style.left = `${rect.left - 4}px`;
+      });
+
+      // Drag over - show drop indicator
+      bookmarkElement.addEventListener("dragover", (e) => {
+        if (this.draggedBookmarkId && this.draggedBookmarkId !== bookmark.id) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          this.showDragIndicator(bookmarkElement, e);
         }
-        
-        indicator.style.top = `${rect.top}px`;
-        document.body.appendChild(indicator);
+      });
+
+      // Drop - reorder bookmarks
+      bookmarkElement.addEventListener("drop", (e) => {
+        if (this.draggedBookmarkId && this.draggedBookmarkId !== bookmark.id) {
+          e.preventDefault();
+          this.reorderBookmarks(this.draggedBookmarkId, bookmark.id, e);
+          this.removeDragIndicator();
+        }
+      });
+
+      // Handle favicon error - show fallback
+      const faviconImg = bookmarkElement.querySelector(".bookmark-favicon");
+      const fallbackDiv = bookmarkElement.querySelector(".bookmark-fallback");
+
+      faviconImg.addEventListener("error", () => {
+        faviconImg.style.display = "none";
+        fallbackDiv.style.display = "block";
+      });
+    });
+
+    // Add event listeners for folder tiles
+    this.folders.forEach((folder) => {
+      const folderElement = quickAccessContainer.querySelector(
+        `[data-folder-id="${folder.id}"]`,
+      );
+      if (folderElement) {
+        // Left click - open folder
+        folderElement.addEventListener("click", (e) => {
+          e.preventDefault();
+          this.openFolder(folder.id);
+        });
+
+        // Right click - show folder context menu
+        folderElement.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          this.showFolderContextMenu(e, folder.id);
+        });
+
+        // Drag over - accept bookmarks
+        folderElement.addEventListener("dragover", (e) => {
+          if (this.draggedBookmarkId && !this.openFolderId) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            folderElement.classList.add("bg-amber-200", "border-amber-400");
+          }
+        });
+
+        // Drag leave - remove drop indicator
+        folderElement.addEventListener("dragleave", (e) => {
+          folderElement.classList.remove("bg-amber-200", "border-amber-400");
+        });
+
+        // Drop - move bookmark to folder
+        folderElement.addEventListener("drop", (e) => {
+          if (this.draggedBookmarkId && !this.openFolderId) {
+            e.preventDefault();
+            this.moveBookmarkToFolder(this.draggedBookmarkId, folder.id);
+            folderElement.classList.remove("bg-amber-200", "border-amber-400");
+          }
+        });
+      }
+    });
+
+    // Add event listener for the add bookmark tile
+    const addBookmarkTile =
+      quickAccessContainer.querySelector("#addBookmarkTile");
+    if (addBookmarkTile) {
+      addBookmarkTile.addEventListener("click", () => {
+        this.showAddBookmarkModal();
+      });
+    }
+  }
+
+  showDragIndicator(targetElement, event) {
+    this.removeDragIndicator();
+
+    const rect = targetElement.getBoundingClientRect();
+    const midPoint = rect.left + rect.width / 2;
+    const isRightSide = event.clientX > midPoint;
+
+    const indicator = document.createElement("div");
+    indicator.id = "dragIndicator";
+    indicator.className =
+      "absolute top-0 bottom-0 w-1 bg-blue-500 z-50 rounded-full";
+    indicator.style.height = `${rect.height}px`;
+
+    if (isRightSide) {
+      indicator.style.left = `${rect.right}px`;
+    } else {
+      indicator.style.left = `${rect.left - 4}px`;
     }
 
-    removeDragIndicator() {
-        const indicator = document.getElementById('dragIndicator');
-        if (indicator) {
-            indicator.remove();
-        }
+    indicator.style.top = `${rect.top}px`;
+    document.body.appendChild(indicator);
+  }
+
+  removeDragIndicator() {
+    const indicator = document.getElementById("dragIndicator");
+    if (indicator) {
+      indicator.remove();
+    }
+  }
+
+  async reorderBookmarks(draggedId, targetId, event) {
+    const draggedIndex = this.bookmarks.findIndex((b) => b.id == draggedId);
+    const targetIndex = this.bookmarks.findIndex((b) => b.id == targetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Determine if we're inserting before or after the target
+    const targetElement = document.querySelector(
+      `[data-bookmark-id="${targetId}"]`,
+    );
+    const rect = targetElement.getBoundingClientRect();
+    const midPoint = rect.left + rect.width / 2;
+    const insertAfter = event.clientX > midPoint;
+
+    // Remove the dragged bookmark from its current position
+    const draggedBookmark = this.bookmarks.splice(draggedIndex, 1)[0];
+
+    // Calculate new insert position
+    let newIndex = targetIndex;
+    if (draggedIndex < targetIndex) {
+      newIndex = insertAfter ? targetIndex : targetIndex - 1;
+    } else {
+      newIndex = insertAfter ? targetIndex + 1 : targetIndex;
     }
 
-    async reorderBookmarks(draggedId, targetId, event) {
-        const draggedIndex = this.bookmarks.findIndex(b => b.id == draggedId);
-        const targetIndex = this.bookmarks.findIndex(b => b.id == targetId);
-        
-        if (draggedIndex === -1 || targetIndex === -1) return;
-        
-        // Determine if we're inserting before or after the target
-        const targetElement = document.querySelector(`[data-bookmark-id="${targetId}"]`);
-        const rect = targetElement.getBoundingClientRect();
-        const midPoint = rect.left + rect.width / 2;
-        const insertAfter = event.clientX > midPoint;
-        
-        // Remove the dragged bookmark from its current position
-        const draggedBookmark = this.bookmarks.splice(draggedIndex, 1)[0];
-        
-        // Calculate new insert position
-        let newIndex = targetIndex;
-        if (draggedIndex < targetIndex) {
-            newIndex = insertAfter ? targetIndex : targetIndex - 1;
-        } else {
-            newIndex = insertAfter ? targetIndex + 1 : targetIndex;
-        }
-        
-        // Insert bookmark at new position
-        this.bookmarks.splice(newIndex, 0, draggedBookmark);
-        
-        // Save and re-render
+    // Insert bookmark at new position
+    this.bookmarks.splice(newIndex, 0, draggedBookmark);
+
+    // Update positions and lastUpdated
+    const now = new Date().toISOString();
+    this.bookmarks.forEach((b, i) => {
+      b.position = i;
+      b.lastUpdated = now;
+    });
+
+    // Save and re-render
+    await this.saveBookmarks();
+    this.renderQuickAccess();
+
+    // Enqueue reorder sync
+    const reorderItems = this.bookmarks
+      .filter((b) => !b.folderId)
+      .map((b, i) => ({ id: b.id, position: i }));
+    enqueueSync("reorder", { items: reorderItems });
+  }
+
+  // Helper function to set appropriate z-index class based on open modals
+  setElementZIndex(element) {
+    // Remove all possible z-index classes first
+    element.classList.remove("z-50", "z-60", "z-70", "z-80", "z-90");
+
+    // Check which modals are open to determine appropriate z-index
+    const modals = [
+      { id: "addBookmarkModal", zIndex: 50 },
+      { id: "editBookmarkModal", zIndex: 60 },
+      { id: "deleteConfirmPopup", zIndex: 50 },
+      { id: "createFolderModal", zIndex: 50 },
+      { id: "renameFolderModal", zIndex: 50 },
+      { id: "folderModal", zIndex: 50 },
+      { id: "settingsModal", zIndex: 50 },
+    ];
+
+    let highestModalZIndex = 0;
+
+    for (const modal of modals) {
+      const modalElement = document.getElementById(modal.id);
+      if (modalElement && !modalElement.classList.contains("hidden")) {
+        highestModalZIndex = Math.max(highestModalZIndex, modal.zIndex);
+      }
+    }
+
+    // Set appropriate z-index class based on highest modal
+    if (highestModalZIndex >= 60) {
+      element.classList.add("z-80"); // Above edit modals
+    } else if (highestModalZIndex >= 50) {
+      element.classList.add("z-70"); // Above regular modals
+    } else {
+      element.classList.add("z-60"); // Default high level
+    }
+  }
+
+  showContextMenu(event, bookmarkId) {
+    console.log("showContextMenu called with bookmarkId:", bookmarkId);
+    this.currentBookmarkId = bookmarkId;
+    const contextMenu = document.getElementById("contextMenu");
+
+    // Show bookmark menu items and hide folder menu items
+    document.getElementById("editBookmark").classList.remove("hidden");
+    document.getElementById("duplicateBookmark").classList.remove("hidden");
+    document.getElementById("copyBookmarkUrl").classList.remove("hidden");
+    document.getElementById("deleteBookmark").classList.remove("hidden");
+    document.getElementById("renameFolder").classList.add("hidden");
+    document.getElementById("deleteFolder").classList.add("hidden");
+
+    // Set z-index based on open modals
+    this.setElementZIndex(contextMenu);
+
+    // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning
+    contextMenu.style.left = `${event.pageX}px`;
+    contextMenu.style.top = `${event.pageY}px`;
+    contextMenu.classList.remove("hidden");
+
+    // Adjust position if menu goes off screen
+    const rect = contextMenu.getBoundingClientRect();
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+
+    if (rect.right > windowWidth) {
+      contextMenu.style.left = `${event.pageX - rect.width}px`;
+    }
+    if (rect.bottom > windowHeight) {
+      contextMenu.style.top = `${event.pageY - rect.height}px`;
+    }
+  }
+
+  hideContextMenu() {
+    const contextMenu = document.getElementById("contextMenu");
+    contextMenu.classList.add("hidden");
+    // Reset z-index to default
+    contextMenu.classList.remove("z-70", "z-80", "z-90");
+    contextMenu.classList.add("z-60");
+    // Don't clear currentBookmarkId or currentFolderId here as they're needed for edit/delete operations
+  }
+
+  showEditBookmarkModal() {
+    console.log(
+      "showEditBookmarkModal called, currentBookmarkId:",
+      this.currentBookmarkId,
+    );
+    const bookmark = this.bookmarks.find(
+      (b) => b.id === this.currentBookmarkId,
+    );
+    console.log("Found bookmark:", bookmark);
+    if (!bookmark) {
+      console.log("No bookmark found, exiting");
+      return;
+    }
+
+    // Highlight the bookmark being edited
+    this.highlightBookmarkBeingEdited(this.currentBookmarkId);
+
+    const modal = document.getElementById("editBookmarkModal");
+    const modalTitle = modal.querySelector("h3");
+    modalTitle.textContent = "Edit Bookmark";
+
+    document.getElementById("editBookmarkTitle").value = bookmark.title;
+    document.getElementById("editBookmarkUrl").value = bookmark.url;
+
+    // Set z-index based on open modals
+    this.setElementZIndex(modal);
+
+    // Position the modal near the bookmark being edited
+    this.positionEditModal(modal);
+
+    // Show favicon selection UI immediately
+    const faviconSelection = document.getElementById("editFaviconSelection");
+    const faviconOptions = document.getElementById("editFaviconOptions");
+    faviconSelection.classList.remove("hidden");
+    faviconOptions.innerHTML =
+      '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
+
+    // Trigger favicon loading for the current URL
+    this.handleEditUrlInputChange(bookmark.url);
+
+    modal.classList.remove("hidden");
+    document.getElementById("editBookmarkTitle").focus();
+  }
+
+  showDuplicateBookmarkModal() {
+    console.log(
+      "showDuplicateBookmarkModal called, currentBookmarkId:",
+      this.currentBookmarkId,
+    );
+    const bookmark = this.bookmarks.find(
+      (b) => b.id === this.currentBookmarkId,
+    );
+    console.log("Found bookmark:", bookmark);
+    if (!bookmark) {
+      console.log("No bookmark found, exiting");
+      return;
+    }
+
+    // Highlight the bookmark being duplicated
+    this.highlightBookmarkBeingEdited(this.currentBookmarkId);
+
+    const modal = document.getElementById("editBookmarkModal");
+    const modalTitle = modal.querySelector("h3");
+    modalTitle.textContent = "Duplicate Bookmark";
+
+    document.getElementById("editBookmarkTitle").value = bookmark.title;
+    document.getElementById("editBookmarkUrl").value = bookmark.url;
+
+    // Set z-index based on open modals
+    this.setElementZIndex(modal);
+
+    // Position the modal near the bookmark being duplicated
+    this.positionEditModal(modal);
+
+    modal.classList.remove("hidden");
+    document.getElementById("editBookmarkTitle").focus();
+  }
+
+  async hideEditBookmarkModal() {
+    // Remove highlighting
+    this.removeBookmarkHighlight();
+
+    const modal = document.getElementById("editBookmarkModal");
+    modal.classList.add("hidden");
+    // Reset z-index to default
+    modal.classList.remove("z-70", "z-80", "z-90");
+    modal.classList.add("z-60");
+    document.getElementById("editBookmarkForm").reset();
+    document.getElementById("editFaviconSelection").classList.add("hidden");
+    this.selectedEditFavicon = null;
+    this.currentBookmarkId = null;
+    if (this.editFaviconDebounceTimer) {
+      clearTimeout(this.editFaviconDebounceTimer);
+    }
+    this.isDuplicateMode = false;
+    this.duplicatedBookmarkId = null;
+  }
+
+  async cancelEditBookmarkModal() {
+    // If we're in duplicate mode and cancelling, delete the duplicate
+    if (this.isDuplicateMode && this.duplicatedBookmarkId) {
+      await this.deleteBookmarkById(this.duplicatedBookmarkId);
+      this.renderQuickAccess();
+    }
+
+    this.hideEditBookmarkModal();
+  }
+
+  async updateBookmark() {
+    if (!this.currentBookmarkId) return;
+
+    const title = document.getElementById("editBookmarkTitle").value.trim();
+    const rawUrl = document.getElementById("editBookmarkUrl").value.trim();
+    const url = this.normalizeUrl(rawUrl);
+
+    if (!title || !url) return;
+
+    const bookmarkIndex = this.bookmarks.findIndex(
+      (b) => b.id === this.currentBookmarkId,
+    );
+    if (bookmarkIndex === -1) return;
+
+    const oldUrl = this.bookmarks[bookmarkIndex].url;
+    const bookmarkId = this.currentBookmarkId;
+
+    // Apply locally first
+    const updates = { title, url, lastUpdated: new Date().toISOString() };
+    if (this.selectedEditFavicon !== null) {
+      updates.favicon = this.selectedEditFavicon;
+    }
+    this.bookmarks[bookmarkIndex] = {
+      ...this.bookmarks[bookmarkIndex],
+      ...updates,
+    };
+
+    await this.saveBookmarks();
+    this.renderQuickAccess();
+
+    const editedBookmark = this.bookmarks[bookmarkIndex];
+    if (
+      this.openFolderId &&
+      editedBookmark &&
+      editedBookmark.folderId === this.openFolderId
+    ) {
+      this.renderFolderBookmarks(this.openFolderId);
+    }
+
+    this.hideEditBookmarkModal();
+
+    if (url !== oldUrl && this.selectedEditFavicon === null) {
+      this.updateFaviconAsync(bookmarkId, url);
+    }
+
+    // Enqueue sync
+    enqueueSync("update_bookmark", {
+      id: bookmarkId,
+      updates: { title, url, favicon: updates.favicon },
+    });
+  }
+
+  async duplicateBookmark() {
+    if (!this.currentBookmarkId) return;
+
+    const bookmark = this.bookmarks.find(
+      (b) => b.id === this.currentBookmarkId,
+    );
+    if (!bookmark) return;
+
+    const now = new Date().toISOString();
+    const duplicatedBookmark = {
+      ...bookmark,
+      id: Date.now(),
+      title: bookmark.title,
+      dateAdded: now,
+      lastUpdated: now,
+    };
+
+    const originalIndex = this.bookmarks.findIndex(
+      (b) => b.id === this.currentBookmarkId,
+    );
+    this.bookmarks.splice(originalIndex + 1, 0, duplicatedBookmark);
+    await this.saveBookmarks();
+    this.renderQuickAccess();
+
+    // Enqueue sync
+    enqueueSync("create_bookmark", {
+      localId: duplicatedBookmark.id,
+      title: duplicatedBookmark.title,
+      url: duplicatedBookmark.url,
+      favicon: duplicatedBookmark.favicon || null,
+      folderId: duplicatedBookmark.folderId,
+      position: originalIndex + 1,
+    });
+
+    // If we're in a folder modal, also update the folder view
+    if (this.openFolderId && bookmark.folderId === this.openFolderId) {
+      this.renderFolderBookmarks(this.openFolderId);
+    }
+
+    this.currentBookmarkId = duplicatedBookmark.id;
+    this.isDuplicateMode = true;
+    this.duplicatedBookmarkId = duplicatedBookmark.id;
+    this.showDuplicateBookmarkModal();
+
+    setTimeout(() => {
+      const titleInput = document.getElementById("editBookmarkTitle");
+      titleInput.focus();
+      titleInput.select();
+    }, 100);
+  }
+
+  async copyBookmarkUrl() {
+    if (!this.currentBookmarkId) return;
+
+    const bookmark = this.bookmarks.find(
+      (b) => b.id === this.currentBookmarkId,
+    );
+    if (!bookmark) return;
+
+    try {
+      await navigator.clipboard.writeText(bookmark.url);
+      console.log("Bookmark URL copied to clipboard:", bookmark.url);
+      this.showCopyNotification();
+    } catch (error) {
+      console.error("Failed to copy URL to clipboard:", error);
+
+      // Fallback for browsers that don't support navigator.clipboard
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = bookmark.url;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+        console.log(
+          "Bookmark URL copied to clipboard (fallback method):",
+          bookmark.url,
+        );
+        this.showCopyNotification();
+      } catch (fallbackError) {
+        console.error(
+          "Failed to copy URL with fallback method:",
+          fallbackError,
+        );
+        // Don't show notification if both methods failed
+      }
+    }
+  }
+
+  showCopyNotification() {
+    const notification = document.getElementById("copyNotification");
+    const notificationContent = notification.querySelector("div");
+
+    // Show the notification container
+    notification.classList.remove("hidden");
+
+    // Animate the notification content sliding in from the right
+    setTimeout(() => {
+      notificationContent.classList.remove("translate-x-full");
+      notificationContent.classList.add("translate-x-0");
+    }, 10);
+
+    // Hide the notification after 2 seconds
+    setTimeout(() => {
+      notificationContent.classList.remove("translate-x-0");
+      notificationContent.classList.add("translate-x-full");
+
+      // Hide the container after animation completes
+      setTimeout(() => {
+        notification.classList.add("hidden");
+      }, 300);
+    }, 2000);
+  }
+
+  async updateFaviconAsync(bookmarkId, url) {
+    try {
+      const faviconUrl = await this.getHighResolutionFavicon(url);
+      const bookmarkIndex = this.bookmarks.findIndex(
+        (b) => b.id === bookmarkId,
+      );
+
+      if (bookmarkIndex !== -1 && faviconUrl) {
+        this.bookmarks[bookmarkIndex].favicon = faviconUrl;
+        this.bookmarks[bookmarkIndex].lastUpdated = new Date().toISOString();
         await this.saveBookmarks();
-        this.renderQuickAccess();
+        // Enqueue sync for favicon update
+        enqueueSync("update_bookmark", {
+          id: bookmarkId,
+          updates: { favicon: faviconUrl },
+        });
 
-        // Sync positions to server in background
-        if (api.isAuthenticated()) {
-            const reorderItems = this.bookmarks
-                .filter(b => !b.folderId)
-                .map((b, i) => ({ id: b.id, position: i }));
-            api.reorderItems(reorderItems).catch(e =>
-                console.log('Background sync (reorder) failed:', e.message)
-            );
-        }
-    }
-
-    // Helper function to set appropriate z-index class based on open modals
-    setElementZIndex(element) {
-        // Remove all possible z-index classes first
-        element.classList.remove('z-50', 'z-60', 'z-70', 'z-80', 'z-90');
-        
-        // Check which modals are open to determine appropriate z-index
-        const modals = [
-            { id: 'addBookmarkModal', zIndex: 50 },
-            { id: 'editBookmarkModal', zIndex: 60 },
-            { id: 'deleteConfirmPopup', zIndex: 50 },
-            { id: 'createFolderModal', zIndex: 50 },
-            { id: 'renameFolderModal', zIndex: 50 },
-            { id: 'folderModal', zIndex: 50 },
-            { id: 'settingsModal', zIndex: 50 }
-        ];
-        
-        let highestModalZIndex = 0;
-        
-        for (const modal of modals) {
-            const modalElement = document.getElementById(modal.id);
-            if (modalElement && !modalElement.classList.contains('hidden')) {
-                highestModalZIndex = Math.max(highestModalZIndex, modal.zIndex);
-            }
-        }
-        
-        // Set appropriate z-index class based on highest modal
-        if (highestModalZIndex >= 60) {
-            element.classList.add('z-80'); // Above edit modals
-        } else if (highestModalZIndex >= 50) {
-            element.classList.add('z-70'); // Above regular modals  
-        } else {
-            element.classList.add('z-60'); // Default high level
-        }
-    }
-
-    showContextMenu(event, bookmarkId) {
-        console.log('showContextMenu called with bookmarkId:', bookmarkId);
-        this.currentBookmarkId = bookmarkId;
-        const contextMenu = document.getElementById('contextMenu');
-        
-        // Show bookmark menu items and hide folder menu items
-        document.getElementById('editBookmark').classList.remove('hidden');
-        document.getElementById('duplicateBookmark').classList.remove('hidden');
-        document.getElementById('copyBookmarkUrl').classList.remove('hidden');
-        document.getElementById('deleteBookmark').classList.remove('hidden');
-        document.getElementById('renameFolder').classList.add('hidden');
-        document.getElementById('deleteFolder').classList.add('hidden');
-        
-        // Set z-index based on open modals
-        this.setElementZIndex(contextMenu);
-        
-        // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning
-        contextMenu.style.left = `${event.pageX}px`;
-        contextMenu.style.top = `${event.pageY}px`;
-        contextMenu.classList.remove('hidden');
-        
-        // Adjust position if menu goes off screen
-        const rect = contextMenu.getBoundingClientRect();
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
-        
-        if (rect.right > windowWidth) {
-            contextMenu.style.left = `${event.pageX - rect.width}px`;
-        }
-        if (rect.bottom > windowHeight) {
-            contextMenu.style.top = `${event.pageY - rect.height}px`;
-        }
-    }
-
-    hideContextMenu() {
-        const contextMenu = document.getElementById('contextMenu');
-        contextMenu.classList.add('hidden');
-        // Reset z-index to default
-        contextMenu.classList.remove('z-70', 'z-80', 'z-90');
-        contextMenu.classList.add('z-60');
-        // Don't clear currentBookmarkId or currentFolderId here as they're needed for edit/delete operations
-    }
-
-    showEditBookmarkModal() {
-        console.log('showEditBookmarkModal called, currentBookmarkId:', this.currentBookmarkId);
-        const bookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
-        console.log('Found bookmark:', bookmark);
-        if (!bookmark) {
-            console.log('No bookmark found, exiting');
-            return;
-        }
-        
-        // Highlight the bookmark being edited
-        this.highlightBookmarkBeingEdited(this.currentBookmarkId);
-        
-        const modal = document.getElementById('editBookmarkModal');
-        const modalTitle = modal.querySelector('h3');
-        modalTitle.textContent = 'Edit Bookmark';
-        
-        document.getElementById('editBookmarkTitle').value = bookmark.title;
-        document.getElementById('editBookmarkUrl').value = bookmark.url;
-        
-        // Set z-index based on open modals
-        this.setElementZIndex(modal);
-        
-        // Position the modal near the bookmark being edited
-        this.positionEditModal(modal);
-        
-        // Show favicon selection UI immediately
-        const faviconSelection = document.getElementById('editFaviconSelection');
-        const faviconOptions = document.getElementById('editFaviconOptions');
-        faviconSelection.classList.remove('hidden');
-        faviconOptions.innerHTML = '<div class="text-sm text-gray-500 col-span-6 text-center">Loading favicon options...</div>';
-        
-        // Trigger favicon loading for the current URL
-        this.handleEditUrlInputChange(bookmark.url);
-        
-        modal.classList.remove('hidden');
-        document.getElementById('editBookmarkTitle').focus();
-    }
-
-    showDuplicateBookmarkModal() {
-        console.log('showDuplicateBookmarkModal called, currentBookmarkId:', this.currentBookmarkId);
-        const bookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
-        console.log('Found bookmark:', bookmark);
-        if (!bookmark) {
-            console.log('No bookmark found, exiting');
-            return;
-        }
-        
-        // Highlight the bookmark being duplicated
-        this.highlightBookmarkBeingEdited(this.currentBookmarkId);
-        
-        const modal = document.getElementById('editBookmarkModal');
-        const modalTitle = modal.querySelector('h3');
-        modalTitle.textContent = 'Duplicate Bookmark';
-        
-        document.getElementById('editBookmarkTitle').value = bookmark.title;
-        document.getElementById('editBookmarkUrl').value = bookmark.url;
-        
-        // Set z-index based on open modals
-        this.setElementZIndex(modal);
-        
-        // Position the modal near the bookmark being duplicated
-        this.positionEditModal(modal);
-        
-        modal.classList.remove('hidden');
-        document.getElementById('editBookmarkTitle').focus();
-    }
-
-    async hideEditBookmarkModal() {
-        // Remove highlighting
-        this.removeBookmarkHighlight();
-        
-        const modal = document.getElementById('editBookmarkModal');
-        modal.classList.add('hidden');
-        // Reset z-index to default
-        modal.classList.remove('z-70', 'z-80', 'z-90');
-        modal.classList.add('z-60');
-        document.getElementById('editBookmarkForm').reset();
-        document.getElementById('editFaviconSelection').classList.add('hidden');
-        this.selectedEditFavicon = null;
-        this.currentBookmarkId = null;
-        if (this.editFaviconDebounceTimer) {
-            clearTimeout(this.editFaviconDebounceTimer);
-        }
-        this.isDuplicateMode = false;
-        this.duplicatedBookmarkId = null;
-    }
-
-    async cancelEditBookmarkModal() {
-        // If we're in duplicate mode and cancelling, delete the duplicate
-        if (this.isDuplicateMode && this.duplicatedBookmarkId) {
-            await this.deleteBookmarkById(this.duplicatedBookmarkId);
-            this.renderQuickAccess();
-        }
-        
-        this.hideEditBookmarkModal();
-    }
-
-    async updateBookmark() {
-        if (!this.currentBookmarkId) return;
-        
-        const title = document.getElementById('editBookmarkTitle').value.trim();
-        const rawUrl = document.getElementById('editBookmarkUrl').value.trim();
-        const url = this.normalizeUrl(rawUrl);
-
-        if (!title || !url) return;
-
-        const bookmarkIndex = this.bookmarks.findIndex(b => b.id === this.currentBookmarkId);
-        if (bookmarkIndex === -1) return;
-
-        const oldUrl = this.bookmarks[bookmarkIndex].url;
-        const bookmarkId = this.currentBookmarkId;
-
-        // Apply locally first
-        const updates = { title, url };
-        if (this.selectedEditFavicon !== null) {
-            updates.favicon = this.selectedEditFavicon;
-        }
-        this.bookmarks[bookmarkIndex] = { ...this.bookmarks[bookmarkIndex], ...updates };
-
-        await this.saveBookmarks();
-        this.renderQuickAccess();
-        
-        const editedBookmark = this.bookmarks[bookmarkIndex];
-        if (this.openFolderId && editedBookmark && editedBookmark.folderId === this.openFolderId) {
-            this.renderFolderBookmarks(this.openFolderId);
-        }
-        
-        this.hideEditBookmarkModal();
-        
-        if (url !== oldUrl && this.selectedEditFavicon === null) {
-            this.updateFaviconAsync(bookmarkId, url);
-        }
-
-        // Sync to server in background
-        if (api.isAuthenticated()) {
-            api.updateBookmark(bookmarkId, updates).catch(e =>
-                console.log('Background sync (update bookmark) failed:', e.message)
-            );
-        }
-    }
-
-    async duplicateBookmark() {
-        if (!this.currentBookmarkId) return;
-        
-        const bookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
-        if (!bookmark) return;
-        
-        const duplicatedBookmark = {
-            ...bookmark,
-            id: Date.now(),
-            title: bookmark.title,
-            dateAdded: new Date().toISOString(),
-        };
-        
-        const originalIndex = this.bookmarks.findIndex(b => b.id === this.currentBookmarkId);
-        this.bookmarks.splice(originalIndex + 1, 0, duplicatedBookmark);
-        await this.saveBookmarks();
-        this.renderQuickAccess();
-
-        // Sync to server in background
-        this._syncCreateBookmark(duplicatedBookmark);
-        
-        // If we're in a folder modal, also update the folder view
-        if (this.openFolderId && bookmark.folderId === this.openFolderId) {
-            this.renderFolderBookmarks(this.openFolderId);
-        }
-        
-        this.currentBookmarkId = duplicatedBookmark.id;
-        this.isDuplicateMode = true;
-        this.duplicatedBookmarkId = duplicatedBookmark.id;
-        this.showDuplicateBookmarkModal();
-        
-        setTimeout(() => {
-            const titleInput = document.getElementById('editBookmarkTitle');
-            titleInput.focus();
-            titleInput.select();
-        }, 100);
-    }
-
-    async copyBookmarkUrl() {
-        if (!this.currentBookmarkId) return;
-        
-        const bookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
-        if (!bookmark) return;
-        
-        try {
-            await navigator.clipboard.writeText(bookmark.url);
-            console.log('Bookmark URL copied to clipboard:', bookmark.url);
-            this.showCopyNotification();
-        } catch (error) {
-            console.error('Failed to copy URL to clipboard:', error);
-            
-            // Fallback for browsers that don't support navigator.clipboard
-            try {
-                const textArea = document.createElement('textarea');
-                textArea.value = bookmark.url;
-                textArea.style.position = 'fixed';
-                textArea.style.left = '-999999px';
-                textArea.style.top = '-999999px';
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                console.log('Bookmark URL copied to clipboard (fallback method):', bookmark.url);
-                this.showCopyNotification();
-            } catch (fallbackError) {
-                console.error('Failed to copy URL with fallback method:', fallbackError);
-                // Don't show notification if both methods failed
-            }
-        }
-    }
-
-    showCopyNotification() {
-        const notification = document.getElementById('copyNotification');
-        const notificationContent = notification.querySelector('div');
-        
-        // Show the notification container
-        notification.classList.remove('hidden');
-        
-        // Animate the notification content sliding in from the right
-        setTimeout(() => {
-            notificationContent.classList.remove('translate-x-full');
-            notificationContent.classList.add('translate-x-0');
-        }, 10);
-        
-        // Hide the notification after 2 seconds
-        setTimeout(() => {
-            notificationContent.classList.remove('translate-x-0');
-            notificationContent.classList.add('translate-x-full');
-            
-            // Hide the container after animation completes
-            setTimeout(() => {
-                notification.classList.add('hidden');
-            }, 300);
-        }, 2000);
-    }
-
-    async updateFaviconAsync(bookmarkId, url) {
-        try {
-            const faviconUrl = await this.getHighResolutionFavicon(url);
-            const bookmarkIndex = this.bookmarks.findIndex(b => b.id === bookmarkId);
-            
-            if (bookmarkIndex !== -1 && faviconUrl) {
-                this.bookmarks[bookmarkIndex].favicon = faviconUrl;
-                await this.saveBookmarks();
-                // Also update on server
-                if (api.isAuthenticated()) {
-                    try {
-                        await api.updateBookmark(bookmarkId, { favicon: faviconUrl });
-                    } catch (e) {
-                        console.log('Failed to update favicon on server:', e.message);
-                    }
-                }
-                
-                const bookmarkElement = document.querySelector(`[data-bookmark-id="${bookmarkId}"]`);
-                if (bookmarkElement) {
-                    const faviconImg = bookmarkElement.querySelector('.bookmark-favicon');
-                    const fallbackDiv = bookmarkElement.querySelector('.bookmark-fallback');
-                    
-                    if (faviconImg && fallbackDiv) {
-                        faviconImg.src = faviconUrl;
-                        faviconImg.style.display = 'block';
-                        fallbackDiv.style.display = 'none';
-                        
-                        // Since we're using base64 data URLs, errors should be rare
-                        faviconImg.onerror = () => {
-                            faviconImg.style.display = 'none';
-                            fallbackDiv.style.display = 'block';
-                        };
-                    }
-                }
-            }
-        } catch (error) {
-            console.log('Failed to update favicon asynchronously:', error);
-        }
-    }
-
-    showDeleteConfirmation(event) {
-        if (!this.currentBookmarkId) return;
-        
-        const popup = document.getElementById('deleteConfirmPopup');
-        const bookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
-        
-        if (!bookmark) return;
-        
-        // Highlight the bookmark being deleted
-        this.highlightBookmarkForDeletion(this.currentBookmarkId);
-        
-        // Update the confirmation message with the bookmark title
-        const messageElement = document.getElementById('deleteConfirmMessage');
-        messageElement.innerHTML = `Are you sure you want to delete <strong>${bookmark.title}</strong>?`;
-        
-        // Position the popup near the bookmark being deleted
-        const bookmarkElement = document.querySelector(`[data-bookmark-id="${this.currentBookmarkId}"]`);
+        const bookmarkElement = document.querySelector(
+          `[data-bookmark-id="${bookmarkId}"]`,
+        );
         if (bookmarkElement) {
-            const rect = bookmarkElement.getBoundingClientRect();
-            const popupRect = popup.getBoundingClientRect();
-            
-            // Position popup to the right of the bookmark, or left if not enough space
-            let left = rect.right + 10;
-            let top = rect.top;
-            
-            // Check if popup would go off screen horizontally
-            if (left + 256 > window.innerWidth) { // 256px is popup width (w-64)
-                left = rect.left - 256 - 10;
-            }
-            
-            // Check if popup would go off screen vertically
-            if (top + 100 > window.innerHeight) { // Approximate popup height
-                top = rect.bottom - 100;
-            }
-            
-            // Ensure popup doesn't go above viewport
-            if (top < 0) {
-                top = 10;
-            }
-            
-            // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning  
-            popup.style.left = `${left}px`;
-            popup.style.top = `${top}px`;
-        }
-        
-        // Set z-index based on open modals
-        this.setElementZIndex(popup);
-        
-        popup.classList.remove('hidden');
-    }
-    
-    hideDeleteConfirmation() {
-        // Remove delete highlighting for both bookmarks and folders
-        this.removeDeleteHighlight();
-        this.removeFolderDeleteHighlight();
-        const popup = document.getElementById('deleteConfirmPopup');
-        popup.classList.add('hidden');
-        // Reset z-index to default
-        popup.classList.remove('z-60', 'z-70', 'z-80', 'z-90');
-        popup.classList.add('z-50');
-    }
-    
-    async confirmDeleteBookmark() {
-        // Handle both bookmark and folder deletion
-        if (this.currentBookmarkId) {
-            // Delete bookmark
-            this.removeDeleteHighlight();
-            
-            const deletedBookmark = this.bookmarks.find(b => b.id === this.currentBookmarkId);
-            const deletedId = this.currentBookmarkId;
-            
-            this.bookmarks = this.bookmarks.filter(b => b.id !== this.currentBookmarkId);
-            await this.saveBookmarks();
-            this.renderQuickAccess();
-            await this.cleanupUnusedFavicons();
-            
-            if (this.openFolderId && deletedBookmark && deletedBookmark.folderId === this.openFolderId) {
-                this.renderFolderBookmarks(this.openFolderId);
-            }
-            
-            this.currentBookmarkId = null;
+          const faviconImg = bookmarkElement.querySelector(".bookmark-favicon");
+          const fallbackDiv =
+            bookmarkElement.querySelector(".bookmark-fallback");
 
-            // Sync to server in background
-            if (api.isAuthenticated()) {
-                api.deleteBookmark(deletedId).catch(e =>
-                    console.log('Background sync (delete bookmark) failed:', e.message)
-                );
-            }
-        } else if (this.currentFolderId) {
-            // Delete folder
-            this.removeFolderDeleteHighlight();
-            
-            const deletedFolderId = this.currentFolderId;
-            
-            // Move all bookmarks in this folder back to main view
-            this.bookmarks.forEach(bookmark => {
-                if (bookmark.folderId === this.currentFolderId) {
-                    bookmark.folderId = null;
-                }
-            });
-            
-            if (this.openFolderId === this.currentFolderId) {
-                this.closeFolderModal();
-            }
-            
-            this.folders = this.folders.filter(f => f.id !== this.currentFolderId);
-            
-            await this.saveBookmarks();
-            this.renderQuickAccess();
-            this.currentFolderId = null;
+          if (faviconImg && fallbackDiv) {
+            faviconImg.src = faviconUrl;
+            faviconImg.style.display = "block";
+            fallbackDiv.style.display = "none";
 
-            // Sync to server in background
-            if (api.isAuthenticated()) {
-                api.deleteFolder(deletedFolderId).catch(e =>
-                    console.log('Background sync (delete folder) failed:', e.message)
-                );
-            }
-        }
-    }
-
-    async deleteBookmark() {
-        // This method is now deprecated in favor of showDeleteConfirmation
-        // Keeping for backward compatibility but it won't be used
-        if (!this.currentBookmarkId) return;
-        
-        if (confirm('Are you sure you want to delete this bookmark?')) {
-            this.bookmarks = this.bookmarks.filter(b => b.id !== this.currentBookmarkId);
-            await this.saveBookmarks();
-            this.renderQuickAccess();
-        }
-    }
-
-    async deleteBookmarkById(bookmarkId) {
-        this.bookmarks = this.bookmarks.filter(b => b.id !== bookmarkId);
-        await this.saveBookmarks();
-        await this.cleanupUnusedFavicons();
-
-        // Sync to server in background
-        if (api.isAuthenticated()) {
-            api.deleteBookmark(bookmarkId).catch(e =>
-                console.log('Background sync (delete by id) failed:', e.message)
-            );
-        }
-    }
-
-    // Bookmark highlighting methods
-    highlightBookmarkBeingEdited(bookmarkId) {
-        // Remove any existing highlights
-        this.removeBookmarkHighlight();
-        
-        // Add highlight to the current bookmark
-        const bookmarkElement = document.querySelector(`[data-bookmark-id="${bookmarkId}"]`);
-        if (bookmarkElement) {
-            bookmarkElement.classList.add('tile-highlighted');
-        }
-    }
-
-    removeBookmarkHighlight() {
-        const highlightedElement = document.querySelector('.tile-highlighted');
-        if (highlightedElement) {
-            highlightedElement.classList.remove('tile-highlighted');
-        }
-    }
-
-    // Delete highlighting methods
-    highlightBookmarkForDeletion(bookmarkId) {
-        // Remove any existing highlights
-        this.removeBookmarkHighlight();
-        this.removeDeleteHighlight();
-        
-        // Add delete highlight to the current bookmark
-        const bookmarkElement = document.querySelector(`[data-bookmark-id="${bookmarkId}"]`);
-        if (bookmarkElement) {
-            bookmarkElement.classList.add('tile-delete-highlighted');
-        }
-    }
-
-    removeDeleteHighlight() {
-        const deleteHighlightedElement = document.querySelector('.tile-delete-highlighted');
-        if (deleteHighlightedElement) {
-            deleteHighlightedElement.classList.remove('tile-delete-highlighted');
-        }
-    }
-
-    // Position edit modal near the bookmark being edited
-    positionEditModal(modal) {
-        if (!this.currentBookmarkId) return;
-        
-        const bookmarkElement = document.querySelector(`[data-bookmark-id="${this.currentBookmarkId}"]`);
-        if (!bookmarkElement) return;
-        
-        const rect = bookmarkElement.getBoundingClientRect();
-        
-        // Position modal to the right of the bookmark, or left if not enough space
-        let left = rect.right + 10;
-        let top = rect.top;
-        
-        // Check if modal would go off screen horizontally (384px is modal width - w-96)
-        if (left + 384 > window.innerWidth) {
-            left = rect.left - 384 - 10;
-        }
-        
-        // Check if modal would go off screen vertically (approximate modal height ~300px)
-        if (top + 300 > window.innerHeight) {
-            top = rect.bottom - 300;
-        }
-        
-        // Ensure modal doesn't go above viewport
-        if (top < 0) {
-            top = 10;
-        }
-        
-        // Ensure modal doesn't go too far left
-        if (left < 10) {
-            left = 10;
-        }
-        
-        // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning
-        modal.style.left = `${left}px`;
-        modal.style.top = `${top}px`;
-    }
-
-    // Settings functionality
-    async loadSettings() {
-        try {
-            const data = await chrome.storage.local.get(['bookmarkSettings']);
-            if (data.bookmarkSettings) {
-                this.settings = { ...this.settings, ...data.bookmarkSettings };
-            }
-        } catch (error) {
-            console.warn('Failed to load settings:', error);
-        }
-    }
-
-    async saveSettingsToStorage() {
-        try {
-            await chrome.storage.local.set({
-                bookmarkSettings: this.settings
-            });
-        } catch (error) {
-            console.warn('Failed to save settings:', error);
-        }
-    }
-
-    showSettingsModal() {
-        const modal = document.getElementById('settingsModal');
-        
-        // Load current settings into the modal
-        this.loadCurrentSettingsIntoForm();
-        
-        // Update auth UI and sync buttons visibility
-        this.updateAuthUI();
-        
-        // Position modal at bottom right with specific margins
-        modal.classList.remove('hidden');
-        modal.classList.add('right-6', 'bottom-20', 'mr-8', '-mb-4');
-    }
-
-    hideSettingsModal() {
-        const modal = document.getElementById('settingsModal');
-        modal.classList.add('hidden');
-        modal.classList.remove('right-6', 'bottom-20', 'mr-8', '-mb-4');
-        // Reset form to current settings
-        this.loadCurrentSettingsIntoForm();
-    }
-
-    loadCurrentSettingsIntoForm() {
-        const showTitlesToggle = document.getElementById('showTitles');
-        const showAddButtonToggle = document.getElementById('showAddButton');
-        const tilesPerRowSlider = document.getElementById('tilesPerRow');
-        const tilesPerRowValue = document.getElementById('tilesPerRowValue');
-        const tileGapSlider = document.getElementById('tileGap');
-        const tileGapValue = document.getElementById('tileGapValue');
-        
-        showTitlesToggle.checked = this.settings.showTitles;
-        this.updateToggleVisual(showTitlesToggle);
-        
-        showAddButtonToggle.checked = this.settings.showAddButton;
-        this.updateToggleVisual(showAddButtonToggle);
-        
-        tilesPerRowSlider.value = this.settings.tilesPerRow;
-        tilesPerRowValue.textContent = this.settings.tilesPerRow;
-        
-        tileGapSlider.value = this.settings.tileGap;
-        tileGapValue.textContent = this.settings.tileGap;
-    }
-
-    async saveSettings() {
-        // Save to local storage first
-        await this.saveSettingsToStorage();
-
-        // Sync to server in background
-        if (api.isAuthenticated()) {
-            api.patchSettings(this.settings).catch(e =>
-                console.log('Background sync (settings) failed:', e.message)
-            );
-        }
-    }
-
-    async exportAllData() {
-        try {
-            // Gather all data from local storage
-            const data = {
-                bookmarks: this.bookmarks,
-                folders: this.folders,
-                settings: this.settings,
-                exportDate: new Date().toISOString(),
-                version: "1.0"
+            // Since we're using base64 data URLs, errors should be rare
+            faviconImg.onerror = () => {
+              faviconImg.style.display = "none";
+              fallbackDiv.style.display = "block";
             };
-
-            // Create blob and download
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `youtab-bookmarks-export-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            console.log('Export completed successfully');
-        } catch (error) {
-            console.error('Export failed:', error);
-            alert('Export failed. Please try again.');
+          }
         }
+      }
+    } catch (error) {
+      console.log("Failed to update favicon asynchronously:", error);
+    }
+  }
+
+  showDeleteConfirmation(event) {
+    if (!this.currentBookmarkId) return;
+
+    const popup = document.getElementById("deleteConfirmPopup");
+    const bookmark = this.bookmarks.find(
+      (b) => b.id === this.currentBookmarkId,
+    );
+
+    if (!bookmark) return;
+
+    // Highlight the bookmark being deleted
+    this.highlightBookmarkForDeletion(this.currentBookmarkId);
+
+    // Update the confirmation message with the bookmark title
+    const messageElement = document.getElementById("deleteConfirmMessage");
+    messageElement.innerHTML = `Are you sure you want to delete <strong>${bookmark.title}</strong>?`;
+
+    // Position the popup near the bookmark being deleted
+    const bookmarkElement = document.querySelector(
+      `[data-bookmark-id="${this.currentBookmarkId}"]`,
+    );
+    if (bookmarkElement) {
+      const rect = bookmarkElement.getBoundingClientRect();
+      const popupRect = popup.getBoundingClientRect();
+
+      // Position popup to the right of the bookmark, or left if not enough space
+      let left = rect.right + 10;
+      let top = rect.top;
+
+      // Check if popup would go off screen horizontally
+      if (left + 256 > window.innerWidth) {
+        // 256px is popup width (w-64)
+        left = rect.left - 256 - 10;
+      }
+
+      // Check if popup would go off screen vertically
+      if (top + 100 > window.innerHeight) {
+        // Approximate popup height
+        top = rect.bottom - 100;
+      }
+
+      // Ensure popup doesn't go above viewport
+      if (top < 0) {
+        top = 10;
+      }
+
+      // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning
+      popup.style.left = `${left}px`;
+      popup.style.top = `${top}px`;
     }
 
-    async importAllData() {
+    // Set z-index based on open modals
+    this.setElementZIndex(popup);
+
+    popup.classList.remove("hidden");
+  }
+
+  hideDeleteConfirmation() {
+    // Remove delete highlighting for both bookmarks and folders
+    this.removeDeleteHighlight();
+    this.removeFolderDeleteHighlight();
+    const popup = document.getElementById("deleteConfirmPopup");
+    popup.classList.add("hidden");
+    // Reset z-index to default
+    popup.classList.remove("z-60", "z-70", "z-80", "z-90");
+    popup.classList.add("z-50");
+  }
+
+  async confirmDeleteBookmark() {
+    // Handle both bookmark and folder deletion
+    if (this.currentBookmarkId) {
+      // Delete bookmark
+      this.removeDeleteHighlight();
+
+      const deletedBookmark = this.bookmarks.find(
+        (b) => b.id === this.currentBookmarkId,
+      );
+      const deletedId = this.currentBookmarkId;
+
+      this.bookmarks = this.bookmarks.filter(
+        (b) => b.id !== this.currentBookmarkId,
+      );
+      await this.saveBookmarks();
+      this.renderQuickAccess();
+      await this.cleanupUnusedFavicons();
+
+      if (
+        this.openFolderId &&
+        deletedBookmark &&
+        deletedBookmark.folderId === this.openFolderId
+      ) {
+        this.renderFolderBookmarks(this.openFolderId);
+      }
+
+      this.currentBookmarkId = null;
+
+      // Enqueue sync
+      enqueueSync("delete_bookmark", { id: deletedId });
+    } else if (this.currentFolderId) {
+      // Delete folder
+      this.removeFolderDeleteHighlight();
+
+      const deletedFolderId = this.currentFolderId;
+
+      // Move all bookmarks in this folder back to main view
+      this.bookmarks.forEach((bookmark) => {
+        if (bookmark.folderId === this.currentFolderId) {
+          bookmark.folderId = null;
+        }
+      });
+
+      if (this.openFolderId === this.currentFolderId) {
+        this.closeFolderModal();
+      }
+
+      this.folders = this.folders.filter((f) => f.id !== this.currentFolderId);
+
+      await this.saveBookmarks();
+      this.renderQuickAccess();
+      this.currentFolderId = null;
+
+      // Enqueue sync
+      enqueueSync("delete_folder", { id: deletedFolderId });
+    }
+  }
+
+  async deleteBookmark() {
+    // This method is now deprecated in favor of showDeleteConfirmation
+    // Keeping for backward compatibility but it won't be used
+    if (!this.currentBookmarkId) return;
+
+    if (confirm("Are you sure you want to delete this bookmark?")) {
+      this.bookmarks = this.bookmarks.filter(
+        (b) => b.id !== this.currentBookmarkId,
+      );
+      await this.saveBookmarks();
+      this.renderQuickAccess();
+    }
+  }
+
+  async deleteBookmarkById(bookmarkId) {
+    this.bookmarks = this.bookmarks.filter((b) => b.id !== bookmarkId);
+    await this.saveBookmarks();
+    await this.cleanupUnusedFavicons();
+
+    // Enqueue sync
+    enqueueSync("delete_bookmark", { id: bookmarkId });
+  }
+
+  // Bookmark highlighting methods
+  highlightBookmarkBeingEdited(bookmarkId) {
+    // Remove any existing highlights
+    this.removeBookmarkHighlight();
+
+    // Add highlight to the current bookmark
+    const bookmarkElement = document.querySelector(
+      `[data-bookmark-id="${bookmarkId}"]`,
+    );
+    if (bookmarkElement) {
+      bookmarkElement.classList.add("tile-highlighted");
+    }
+  }
+
+  removeBookmarkHighlight() {
+    const highlightedElement = document.querySelector(".tile-highlighted");
+    if (highlightedElement) {
+      highlightedElement.classList.remove("tile-highlighted");
+    }
+  }
+
+  // Delete highlighting methods
+  highlightBookmarkForDeletion(bookmarkId) {
+    // Remove any existing highlights
+    this.removeBookmarkHighlight();
+    this.removeDeleteHighlight();
+
+    // Add delete highlight to the current bookmark
+    const bookmarkElement = document.querySelector(
+      `[data-bookmark-id="${bookmarkId}"]`,
+    );
+    if (bookmarkElement) {
+      bookmarkElement.classList.add("tile-delete-highlighted");
+    }
+  }
+
+  removeDeleteHighlight() {
+    const deleteHighlightedElement = document.querySelector(
+      ".tile-delete-highlighted",
+    );
+    if (deleteHighlightedElement) {
+      deleteHighlightedElement.classList.remove("tile-delete-highlighted");
+    }
+  }
+
+  // Position edit modal near the bookmark being edited
+  positionEditModal(modal) {
+    if (!this.currentBookmarkId) return;
+
+    const bookmarkElement = document.querySelector(
+      `[data-bookmark-id="${this.currentBookmarkId}"]`,
+    );
+    if (!bookmarkElement) return;
+
+    const rect = bookmarkElement.getBoundingClientRect();
+
+    // Position modal to the right of the bookmark, or left if not enough space
+    let left = rect.right + 10;
+    let top = rect.top;
+
+    // Check if modal would go off screen horizontally (384px is modal width - w-96)
+    if (left + 384 > window.innerWidth) {
+      left = rect.left - 384 - 10;
+    }
+
+    // Check if modal would go off screen vertically (approximate modal height ~300px)
+    if (top + 300 > window.innerHeight) {
+      top = rect.bottom - 300;
+    }
+
+    // Ensure modal doesn't go above viewport
+    if (top < 0) {
+      top = 10;
+    }
+
+    // Ensure modal doesn't go too far left
+    if (left < 10) {
+      left = 10;
+    }
+
+    // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning
+    modal.style.left = `${left}px`;
+    modal.style.top = `${top}px`;
+  }
+
+  // Settings functionality
+  async loadSettings() {
+    try {
+      const data = await chrome.storage.local.get(["bookmarkSettings"]);
+      if (data.bookmarkSettings) {
+        this.settings = { ...this.settings, ...data.bookmarkSettings };
+      }
+    } catch (error) {
+      console.warn("Failed to load settings:", error);
+    }
+  }
+
+  async saveSettingsToStorage() {
+    try {
+      this._localSaveInProgress = true;
+      await chrome.storage.local.set({
+        bookmarkSettings: this.settings,
+      });
+    } catch (error) {
+      console.warn("Failed to save settings:", error);
+    } finally {
+      this._localSaveInProgress = false;
+    }
+  }
+
+  showSettingsModal() {
+    const modal = document.getElementById("settingsModal");
+
+    // Load current settings into the modal
+    this.loadCurrentSettingsIntoForm();
+
+    // Update auth UI and sync buttons visibility
+    this.updateAuthUI();
+
+    // Position modal at bottom right with specific margins
+    modal.classList.remove("hidden");
+    modal.classList.add("right-6", "bottom-20", "mr-8", "-mb-4");
+  }
+
+  hideSettingsModal() {
+    const modal = document.getElementById("settingsModal");
+    modal.classList.add("hidden");
+    modal.classList.remove("right-6", "bottom-20", "mr-8", "-mb-4");
+    // Reset form to current settings
+    this.loadCurrentSettingsIntoForm();
+  }
+
+  loadCurrentSettingsIntoForm() {
+    const showTitlesToggle = document.getElementById("showTitles");
+    const showAddButtonToggle = document.getElementById("showAddButton");
+    const tilesPerRowSlider = document.getElementById("tilesPerRow");
+    const tilesPerRowValue = document.getElementById("tilesPerRowValue");
+    const tileGapSlider = document.getElementById("tileGap");
+    const tileGapValue = document.getElementById("tileGapValue");
+
+    showTitlesToggle.checked = this.settings.showTitles;
+    this.updateToggleVisual(showTitlesToggle);
+
+    showAddButtonToggle.checked = this.settings.showAddButton;
+    this.updateToggleVisual(showAddButtonToggle);
+
+    tilesPerRowSlider.value = this.settings.tilesPerRow;
+    tilesPerRowValue.textContent = this.settings.tilesPerRow;
+
+    tileGapSlider.value = this.settings.tileGap;
+    tileGapValue.textContent = this.settings.tileGap;
+  }
+
+  async saveSettings() {
+    // Add lastUpdated and save to local storage
+    this.settings.lastUpdated = new Date().toISOString();
+    await this.saveSettingsToStorage();
+
+    // Enqueue sync
+    enqueueSync("update_settings", { settings: this.settings });
+  }
+
+  async exportAllData() {
+    try {
+      // Gather all data from local storage
+      const data = {
+        bookmarks: this.bookmarks,
+        folders: this.folders,
+        settings: this.settings,
+        exportDate: new Date().toISOString(),
+        version: "1.0",
+      };
+
+      // Create blob and download
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `youtab-bookmarks-export-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      console.log("Export completed successfully");
+    } catch (error) {
+      console.error("Export failed:", error);
+      alert("Export failed. Please try again.");
+    }
+  }
+
+  async importAllData() {
+    try {
+      // Create file input element
+      const fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.accept = ".json";
+      fileInput.style.display = "none";
+      document.body.appendChild(fileInput);
+
+      // Handle file selection
+      fileInput.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
         try {
-            // Create file input element
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = '.json';
-            fileInput.style.display = 'none';
-            document.body.appendChild(fileInput);
+          const fileContent = await file.text();
+          const importData = JSON.parse(fileContent);
 
-            // Handle file selection
-            fileInput.addEventListener('change', async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
+          // Validate import data structure
+          if (!this.validateImportData(importData)) {
+            throw new Error("Invalid import file format");
+          }
 
-                try {
-                    const fileContent = await file.text();
-                    const importData = JSON.parse(fileContent);
-
-                    // Validate import data structure
-                    if (!this.validateImportData(importData)) {
-                        throw new Error('Invalid import file format');
-                    }
-
-                    // Show import confirmation modal
-                    this.showImportConfirmModal(file.name, importData, fileInput);
-                } catch (error) {
-                    console.error('Import failed:', error);
-                    alert(`Import failed: ${error.message}`);
-                    // Clean up on error
-                    this.cleanupFileInput(fileInput);
-                }
-            });
-
-            // Trigger file dialog
-            fileInput.click();
+          // Show import confirmation modal
+          this.showImportConfirmModal(file.name, importData, fileInput);
         } catch (error) {
-            console.error('Import setup failed:', error);
-            alert('Import setup failed. Please try again.');
+          console.error("Import failed:", error);
+          alert(`Import failed: ${error.message}`);
+          // Clean up on error
+          this.cleanupFileInput(fileInput);
         }
+      });
+
+      // Trigger file dialog
+      fileInput.click();
+    } catch (error) {
+      console.error("Import setup failed:", error);
+      alert("Import setup failed. Please try again.");
+    }
+  }
+
+  validateImportData(data) {
+    // Check if data has the expected structure
+    if (!data || typeof data !== "object") return false;
+
+    // Validate bookmarks array
+    if (data.bookmarks && !Array.isArray(data.bookmarks)) return false;
+    if (data.bookmarks) {
+      for (const bookmark of data.bookmarks) {
+        if (!bookmark.id || !bookmark.title || !bookmark.url) return false;
+      }
     }
 
-    validateImportData(data) {
-        // Check if data has the expected structure
-        if (!data || typeof data !== 'object') return false;
-        
-        // Validate bookmarks array
-        if (data.bookmarks && !Array.isArray(data.bookmarks)) return false;
-        if (data.bookmarks) {
-            for (const bookmark of data.bookmarks) {
-                if (!bookmark.id || !bookmark.title || !bookmark.url) return false;
-            }
-        }
-
-        // Validate folders array
-        if (data.folders && !Array.isArray(data.folders)) return false;
-        if (data.folders) {
-            for (const folder of data.folders) {
-                if (!folder.id || !folder.name) return false;
-            }
-        }
-
-        // Validate settings object
-        if (data.settings && typeof data.settings !== 'object') return false;
-
-        return true;
+    // Validate folders array
+    if (data.folders && !Array.isArray(data.folders)) return false;
+    if (data.folders) {
+      for (const folder of data.folders) {
+        if (!folder.id || !folder.name) return false;
+      }
     }
 
-    async backupCurrentData() {
-        try {
-            const backupData = {
-                bookmarks: this.bookmarks,
-                folders: this.folders,
-                settings: this.settings,
-                backupDate: new Date().toISOString(),
-                version: "1.0"
-            };
+    // Validate settings object
+    if (data.settings && typeof data.settings !== "object") return false;
 
-            // Save backup to local storage with timestamp
-            const backupKey = `backup_${Date.now()}`;
-            await chrome.storage.local.set({
-                [backupKey]: backupData,
-                lastBackup: backupKey
-            });
+    return true;
+  }
 
-            console.log('Current data backed up successfully');
-        } catch (error) {
-            console.warn('Backup failed:', error);
-        }
+  async backupCurrentData() {
+    try {
+      const backupData = {
+        bookmarks: this.bookmarks,
+        folders: this.folders,
+        settings: this.settings,
+        backupDate: new Date().toISOString(),
+        version: "1.0",
+      };
+
+      // Save backup to local storage with timestamp
+      const backupKey = `backup_${Date.now()}`;
+      await chrome.storage.local.set({
+        [backupKey]: backupData,
+        lastBackup: backupKey,
+      });
+
+      console.log("Current data backed up successfully");
+    } catch (error) {
+      console.warn("Backup failed:", error);
     }
+  }
 
-    showImportConfirmModal(fileName, importData, fileInput) {
-        // Store import data for later use
-        this.pendingImportData = importData;
-        this.pendingFileInput = fileInput;
+  showImportConfirmModal(fileName, importData, fileInput) {
+    // Store import data for later use
+    this.pendingImportData = importData;
+    this.pendingFileInput = fileInput;
 
-        // Update modal content
-        document.getElementById('importFileName').textContent = fileName;
-        document.getElementById('importBookmarkCount').textContent = importData.bookmarks?.length || 0;
-        document.getElementById('importFolderCount').textContent = importData.folders?.length || 0;
+    // Update modal content
+    document.getElementById("importFileName").textContent = fileName;
+    document.getElementById("importBookmarkCount").textContent =
+      importData.bookmarks?.length || 0;
+    document.getElementById("importFolderCount").textContent =
+      importData.folders?.length || 0;
 
-        // Show modal
-        document.getElementById('importConfirmModal').classList.remove('hidden');
+    // Show modal
+    document.getElementById("importConfirmModal").classList.remove("hidden");
+  }
+
+  hideImportConfirmModal() {
+    document.getElementById("importConfirmModal").classList.add("hidden");
+
+    // Clean up stored data and file input
+    if (this.pendingFileInput) {
+      this.cleanupFileInput(this.pendingFileInput);
+      this.pendingFileInput = null;
     }
+    this.pendingImportData = null;
+  }
 
-    hideImportConfirmModal() {
-        document.getElementById('importConfirmModal').classList.add('hidden');
-        
-        // Clean up stored data and file input
-        if (this.pendingFileInput) {
-            this.cleanupFileInput(this.pendingFileInput);
-            this.pendingFileInput = null;
-        }
-        this.pendingImportData = null;
+  cleanupFileInput(fileInput) {
+    try {
+      if (fileInput && fileInput.parentNode) {
+        fileInput.parentNode.removeChild(fileInput);
+      }
+    } catch (error) {
+      console.warn("File input cleanup failed:", error);
     }
+  }
 
-    cleanupFileInput(fileInput) {
-        try {
-            if (fileInput && fileInput.parentNode) {
-                fileInput.parentNode.removeChild(fileInput);
-            }
-        } catch (error) {
-            console.warn('File input cleanup failed:', error);
-        }
+  async confirmImport() {
+    try {
+      // Check if import data is available
+      if (!this.pendingImportData) {
+        throw new Error("No import data available");
+      }
+
+      // Store import data before modal cleanup
+      const importData = this.pendingImportData;
+
+      // Hide modal (this clears pendingImportData)
+      this.hideImportConfirmModal();
+
+      // Backup current data before import
+      await this.backupCurrentData();
+
+      // Import the data
+      this.bookmarks = importData.bookmarks || [];
+      this.folders = importData.folders || [];
+      this.settings = { ...this.settings, ...importData.settings };
+
+      // Save imported data
+      await this.saveBookmarks();
+      await this.saveSettingsToStorage();
+
+      // Update UI
+      this.loadCurrentSettingsIntoForm();
+      this.updateTilesPerRowCSS(this.settings.tilesPerRow);
+      this.renderQuickAccess();
+
+      // Show success notification
+      this.showImportNotification();
+      console.log("Import completed successfully");
+
+      // Enqueue full push to server
+      enqueueSync("full_push", {});
+    } catch (error) {
+      console.error("Import failed:", error);
+      alert(`Import failed: ${error.message}`);
     }
+  }
 
-    async confirmImport() {
-        try {
-            // Check if import data is available
-            if (!this.pendingImportData) {
-                throw new Error('No import data available');
-            }
+  showImportNotification() {
+    const notification = document.getElementById("importNotification");
+    const notificationContent = notification.querySelector("div");
 
-            // Store import data before modal cleanup
-            const importData = this.pendingImportData;
+    // Show the notification container
+    notification.classList.remove("hidden");
 
-            // Hide modal (this clears pendingImportData)
-            this.hideImportConfirmModal();
+    // Animate the notification content sliding in from the right
+    setTimeout(() => {
+      notificationContent.classList.remove("translate-x-full");
+      notificationContent.classList.add("translate-x-0");
+    }, 10);
 
-            // Backup current data before import
-            await this.backupCurrentData();
+    // Hide after 3 seconds
+    setTimeout(() => {
+      notificationContent.classList.add("translate-x-full");
+      notificationContent.classList.remove("translate-x-0");
 
-            // Import the data
-            this.bookmarks = importData.bookmarks || [];
-            this.folders = importData.folders || [];
-            this.settings = { ...this.settings, ...importData.settings };
+      // Hide the container after animation completes
+      setTimeout(() => {
+        notification.classList.add("hidden");
+      }, 300);
+    }, 3000);
+  }
 
-            // Save imported data
-            await this.saveBookmarks();
-            await this.saveSettingsToStorage();
+  updateTilesPerRowCSS(tilesPerRow) {
+    const quickAccess = document.getElementById("quickAccess");
+    const folderBookmarks = document.getElementById("folderBookmarks");
 
-            // Update UI
-            this.loadCurrentSettingsIntoForm();
-            this.updateTilesPerRowCSS(this.settings.tilesPerRow);
-            this.renderQuickAccess();
+    // Map tiles per row to appropriate max-width classes - updated for proper gap spacing
+    // Each tile is 96px (w-24), gaps are 16px default, so: tiles*96 + (tiles-1)*16
+    const maxWidthClasses = {
+      3: "max-w-sm", // 3*96 + 2*16 = 320px (~20rem)
+      4: "max-w-md", // 4*96 + 3*16 = 432px (~27rem)
+      5: "max-w-xl", // 5*96 + 4*16 = 544px (~34rem)
+      6: "max-w-2xl", // 6*96 + 5*16 = 656px (~41rem)
+      7: "max-w-3xl", // 7*96 + 6*16 = 768px (~48rem)
+      8: "max-w-4xl", // 8*96 + 7*16 = 880px (~55rem)
+      9: "max-w-5xl", // 9*96 + 8*16 = 992px (~62rem)
+      10: "max-w-6xl", // 10*96 + 9*16 = 1104px (~69rem)
+      11: "max-w-7xl", // 11*96 + 10*16 = 1216px (~76rem)
+      12: "max-w-7xl", // 12*96 + 11*16 = 1328px (~83rem) - use max available
+    };
 
-            // Show success notification
-            this.showImportNotification();
-            console.log('Import completed successfully');
+    // Clear all classes and rebuild with only what we need
+    quickAccess.className = "";
 
-            // Push imported data to server in background
-            this.pushToServer();
-        } catch (error) {
-            console.error('Import failed:', error);
-            alert(`Import failed: ${error.message}`);
-        }
+    // Add new grid class based on tilesPerRow value - explicit mapping for Tailwind compilation
+    const gridClasses = {
+      3: "grid-cols-3",
+      4: "grid-cols-4",
+      5: "grid-cols-5",
+      6: "grid-cols-6",
+      7: "grid-cols-7",
+      8: "grid-cols-8",
+      9: "grid-cols-9",
+      10: "grid-cols-10",
+      11: "grid-cols-11",
+      12: "grid-cols-12",
+    };
+    const gridClass = gridClasses[tilesPerRow] || "grid-cols-8";
+    const maxWidthClass = maxWidthClasses[tilesPerRow];
+
+    // Get gap classes based on setting - separate column and row gaps for better spacing
+    const gapMapping = {
+      0: { x: "gap-x-0", y: "gap-y-0" }, // 0 → no gaps
+      1: { x: "gap-x-4", y: "gap-y-2" }, // 1 → 16px columns, 8px rows
+      2: { x: "gap-x-8", y: "gap-y-4" }, // 2 → 32px columns, 16px rows
+      3: { x: "gap-x-12", y: "gap-y-6" }, // 3 → 48px columns, 24px rows
+      4: { x: "gap-x-16", y: "gap-y-8" }, // 4 → 64px columns, 32px rows
+      5: { x: "gap-x-20", y: "gap-y-10" }, // 5 → 80px columns, 40px rows
+      6: { x: "gap-x-24", y: "gap-y-12" }, // 6 → 96px columns, 48px rows
+      7: { x: "gap-x-28", y: "gap-y-14" }, // 7 → 112px columns, 56px rows
+      8: { x: "gap-x-32", y: "gap-y-16" }, // 8 → 128px columns, 64px rows
+      9: { x: "gap-x-36", y: "gap-y-18" }, // 9 → 144px columns, 72px rows
+      10: { x: "gap-x-40", y: "gap-y-20" }, // 10 → 160px columns, 80px rows
+    };
+    const gaps = gapMapping[this.settings.tileGap] || {
+      x: "gap-x-4",
+      y: "gap-y-2",
+    };
+
+    // Update quickAccess layout - clean slate with only necessary classes
+    quickAccess.classList.add(
+      "grid",
+      gridClass,
+      gaps.x,
+      gaps.y,
+      maxWidthClass,
+      "mx-auto",
+      "place-items-center",
+    );
+
+    // Update folderBookmarks layout if it exists
+    if (folderBookmarks) {
+      folderBookmarks.className = "";
+      folderBookmarks.classList.add(
+        "grid",
+        gridClass,
+        gaps.x,
+        gaps.y,
+        maxWidthClass,
+        "mx-auto",
+        "place-items-center",
+      );
     }
+  }
 
-    showImportNotification() {
-        const notification = document.getElementById('importNotification');
-        const notificationContent = notification.querySelector('div');
-        
-        // Show the notification container
-        notification.classList.remove('hidden');
-        
-        // Animate the notification content sliding in from the right
-        setTimeout(() => {
-            notificationContent.classList.remove('translate-x-full');
-            notificationContent.classList.add('translate-x-0');
-        }, 10);
+  updateToggleVisual(toggle) {
+    const toggleBg = toggle.parentElement.querySelector(".toggle-bg");
+    const toggleDot = toggle.parentElement.querySelector(".toggle-dot");
 
-        // Hide after 3 seconds
-        setTimeout(() => {
-            notificationContent.classList.add('translate-x-full');
-            notificationContent.classList.remove('translate-x-0');
-            
-            // Hide the container after animation completes
-            setTimeout(() => {
-                notification.classList.add('hidden');
-            }, 300);
-        }, 3000);
+    if (toggle.checked) {
+      toggleBg.classList.remove("bg-gray-200");
+      toggleBg.classList.add("bg-blue-500");
+      toggleDot.style.transform = "translateX(16px)";
+    } else {
+      toggleBg.classList.remove("bg-blue-500");
+      toggleBg.classList.add("bg-gray-200");
+      toggleDot.style.transform = "translateX(0)";
     }
+  }
 
-    updateTilesPerRowCSS(tilesPerRow) {
-        const quickAccess = document.getElementById('quickAccess');
-        const folderBookmarks = document.getElementById('folderBookmarks');
-        
-        // Map tiles per row to appropriate max-width classes - updated for proper gap spacing
-        // Each tile is 96px (w-24), gaps are 16px default, so: tiles*96 + (tiles-1)*16
-        const maxWidthClasses = {
-            3: 'max-w-sm',    // 3*96 + 2*16 = 320px (~20rem)
-            4: 'max-w-md',    // 4*96 + 3*16 = 432px (~27rem)  
-            5: 'max-w-xl',    // 5*96 + 4*16 = 544px (~34rem)
-            6: 'max-w-2xl',   // 6*96 + 5*16 = 656px (~41rem)
-            7: 'max-w-3xl',   // 7*96 + 6*16 = 768px (~48rem)
-            8: 'max-w-4xl',   // 8*96 + 7*16 = 880px (~55rem)
-            9: 'max-w-5xl',   // 9*96 + 8*16 = 992px (~62rem)
-            10: 'max-w-6xl',  // 10*96 + 9*16 = 1104px (~69rem)
-            11: 'max-w-7xl',  // 11*96 + 10*16 = 1216px (~76rem)
-            12: 'max-w-7xl'   // 12*96 + 11*16 = 1328px (~83rem) - use max available
-        };
-        
-        // Clear all classes and rebuild with only what we need
-        quickAccess.className = '';
-        
-        // Add new grid class based on tilesPerRow value - explicit mapping for Tailwind compilation
-        const gridClasses = {
-            3: 'grid-cols-3',
-            4: 'grid-cols-4',
-            5: 'grid-cols-5',
-            6: 'grid-cols-6',
-            7: 'grid-cols-7',
-            8: 'grid-cols-8',
-            9: 'grid-cols-9',
-            10: 'grid-cols-10',
-            11: 'grid-cols-11',
-            12: 'grid-cols-12'
-        };
-        const gridClass = gridClasses[tilesPerRow] || 'grid-cols-8';
-        const maxWidthClass = maxWidthClasses[tilesPerRow];
-        
-        // Get gap classes based on setting - separate column and row gaps for better spacing
-        const gapMapping = {
-            0: { x: 'gap-x-0', y: 'gap-y-0' },     // 0 → no gaps
-            1: { x: 'gap-x-4', y: 'gap-y-2' },     // 1 → 16px columns, 8px rows
-            2: { x: 'gap-x-8', y: 'gap-y-4' },     // 2 → 32px columns, 16px rows
-            3: { x: 'gap-x-12', y: 'gap-y-6' },    // 3 → 48px columns, 24px rows
-            4: { x: 'gap-x-16', y: 'gap-y-8' },    // 4 → 64px columns, 32px rows
-            5: { x: 'gap-x-20', y: 'gap-y-10' },   // 5 → 80px columns, 40px rows
-            6: { x: 'gap-x-24', y: 'gap-y-12' },   // 6 → 96px columns, 48px rows
-            7: { x: 'gap-x-28', y: 'gap-y-14' },   // 7 → 112px columns, 56px rows
-            8: { x: 'gap-x-32', y: 'gap-y-16' },   // 8 → 128px columns, 64px rows
-            9: { x: 'gap-x-36', y: 'gap-y-18' },   // 9 → 144px columns, 72px rows
-            10: { x: 'gap-x-40', y: 'gap-y-20' }   // 10 → 160px columns, 80px rows
-        };
-        const gaps = gapMapping[this.settings.tileGap] || { x: 'gap-x-4', y: 'gap-y-2' };
-        
-        // Update quickAccess layout - clean slate with only necessary classes
-        quickAccess.classList.add('grid', gridClass, gaps.x, gaps.y, maxWidthClass, 'mx-auto', 'place-items-center');
-        
-        // Update folderBookmarks layout if it exists
-        if (folderBookmarks) {
-            folderBookmarks.className = '';
-            folderBookmarks.classList.add('grid', gridClass, gaps.x, gaps.y, maxWidthClass, 'mx-auto', 'place-items-center');
-        }
-    }
+  // Folder management methods
+  openFolder(folderId) {
+    const folder = this.folders.find((f) => f.id === folderId);
+    if (!folder) return;
 
-    updateToggleVisual(toggle) {
-        const toggleBg = toggle.parentElement.querySelector('.toggle-bg');
-        const toggleDot = toggle.parentElement.querySelector('.toggle-dot');
-        
-        if (toggle.checked) {
-            toggleBg.classList.remove('bg-gray-200');
-            toggleBg.classList.add('bg-blue-500');
-            toggleDot.style.transform = 'translateX(16px)';
-        } else {
-            toggleBg.classList.remove('bg-blue-500');
-            toggleBg.classList.add('bg-gray-200');
-            toggleDot.style.transform = 'translateX(0)';
-        }
-    }
+    document.getElementById("folderModalTitle").textContent = folder.name;
+    document.getElementById("folderModal").classList.remove("hidden");
 
+    // Store the current open folder ID
+    this.openFolderId = folderId;
 
+    // Set up drag and drop for removing bookmarks from folder
+    this.setupFolderDragAndDrop();
 
-    
+    // Render bookmarks in this folder
+    this.renderFolderBookmarks(folderId);
+  }
 
-    // Folder management methods
-    openFolder(folderId) {
-        const folder = this.folders.find(f => f.id === folderId);
-        if (!folder) return;
-        
-        document.getElementById('folderModalTitle').textContent = folder.name;
-        document.getElementById('folderModal').classList.remove('hidden');
-        
-        // Store the current open folder ID
-        this.openFolderId = folderId;
-        
-        // Set up drag and drop for removing bookmarks from folder
-        this.setupFolderDragAndDrop();
-        
-        // Render bookmarks in this folder
-        this.renderFolderBookmarks(folderId);
-    }
+  closeFolderModal() {
+    document.getElementById("folderModal").classList.add("hidden");
+    this.openFolderId = null;
+    this.cleanupFolderDragAndDrop();
+  }
 
-    closeFolderModal() {
-        document.getElementById('folderModal').classList.add('hidden');
-        this.openFolderId = null;
-        this.cleanupFolderDragAndDrop();
-    }
+  renderFolderBookmarks(folderId) {
+    const folderBookmarksContainer = document.getElementById("folderBookmarks");
+    const folderBookmarks = this.bookmarks.filter(
+      (b) => b.folderId === folderId,
+    );
 
-    renderFolderBookmarks(folderId) {
-        const folderBookmarksContainer = document.getElementById('folderBookmarks');
-        const folderBookmarks = this.bookmarks.filter(b => b.folderId === folderId);
-        
-        if (folderBookmarks.length === 0) {
-            folderBookmarksContainer.innerHTML = `
+    if (folderBookmarks.length === 0) {
+      folderBookmarksContainer.innerHTML = `
                 <div class="text-center text-gray-500 w-full py-8">
                     <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
@@ -2745,459 +2864,484 @@ class BookmarkManager {
                     <p class="text-sm">Drag bookmarks here to organize them</p>
                 </div>
             `;
-            return;
-        }
+      return;
+    }
 
-        const bookmarkTiles = folderBookmarks.map(bookmark => {
-            const paddingClass = this.settings.showTitles ? 'pt-2 px-4 pb-6' : 'p-4';
-            
-            return `
+    const bookmarkTiles = folderBookmarks
+      .map((bookmark) => {
+        const paddingClass = this.settings.showTitles
+          ? "pt-2 px-4 pb-6"
+          : "p-4";
+
+        return `
             <div class="tile w-24 h-24 relative bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-200 hover:shadow-md transition-all duration-200 cursor-pointer" 
                  data-bookmark-id="${bookmark.id}" 
                  draggable="true"
                  title="${bookmark.title}">
                 <a draggable="false" href="${bookmark.url}" aria-label="${bookmark.title}" class="absolute inset-0"></a>
                 <div class="tile-icon absolute inset-0 flex items-center justify-center ${paddingClass}">
-                    <img draggable="false" alt="" src="${bookmark.favicon}" class="w-full h-full rounded-lg object-cover bookmark-favicon" style="display: ${bookmark.favicon ? 'block' : 'none'};">
-                    <div class="w-full h-full bg-blue-500 rounded-lg flex items-center justify-center text-white text-2xl font-bold bookmark-fallback" style="display: ${bookmark.favicon ? 'none' : 'block'};">
+                    <img draggable="false" alt="" src="${bookmark.favicon}" class="w-full h-full rounded-lg object-cover bookmark-favicon" style="display: ${bookmark.favicon ? "block" : "none"};">
+                    <div class="w-full h-full bg-blue-500 rounded-lg flex items-center justify-center text-white text-2xl font-bold bookmark-fallback" style="display: ${bookmark.favicon ? "none" : "block"};">
                         ${bookmark.title.charAt(0).toUpperCase()}
                     </div>
                 </div>
-                ${this.settings.showTitles ? `
+                ${
+                  this.settings.showTitles
+                    ? `
                 <div class="tile-title absolute bottom-1 left-1 right-1">
                     <span class="text-xs text-gray-800 text-center block truncate">${bookmark.title}</span>
-                </div>` : ''}
+                </div>`
+                    : ""
+                }
             </div>
         `;
-        }).join('');
+      })
+      .join("");
 
-        folderBookmarksContainer.innerHTML = bookmarkTiles;
-        
-        // Add event listeners for bookmarks in folder
-        folderBookmarks.forEach(bookmark => {
-            const bookmarkElement = folderBookmarksContainer.querySelector(`[data-bookmark-id="${bookmark.id}"]`);
-            
-            // Left click - navigate to URL
-            bookmarkElement.addEventListener('click', (e) => {
-                if (e.button === 0 && !this.isDragging) {
-                    window.location.href = bookmark.url;
-                }
-            });
-            
-            // Middle click - open in new background tab
-            bookmarkElement.addEventListener('mousedown', (e) => {
-                if (e.button === 1 && !this.isDragging) {
-                    e.preventDefault();
-                    chrome.tabs.create({ url: bookmark.url, active: false });
-                }
-            });
-            
-            // Right click - show context menu
-            bookmarkElement.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                this.showContextMenu(e, bookmark.id);
-            });
+    folderBookmarksContainer.innerHTML = bookmarkTiles;
 
-            // Drag start
-            bookmarkElement.addEventListener('dragstart', (e) => {
-                this.isDragging = true;
-                this.draggedBookmarkId = bookmark.id;
-                bookmarkElement.style.opacity = '0.5';
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/html', bookmarkElement.outerHTML);
-            });
+    // Add event listeners for bookmarks in folder
+    folderBookmarks.forEach((bookmark) => {
+      const bookmarkElement = folderBookmarksContainer.querySelector(
+        `[data-bookmark-id="${bookmark.id}"]`,
+      );
 
-            // Drag end
-            bookmarkElement.addEventListener('dragend', (e) => {
-                this.isDragging = false;
-                this.draggedBookmarkId = null;
-                bookmarkElement.style.opacity = '1';
-                this.removeFolderDragIndicator();
-            });
-
-            // Handle favicon error
-            const faviconImg = bookmarkElement.querySelector('.bookmark-favicon');
-            const fallbackDiv = bookmarkElement.querySelector('.bookmark-fallback');
-            
-            faviconImg.addEventListener('error', () => {
-                faviconImg.style.display = 'none';
-                fallbackDiv.style.display = 'block';
-            });
-        });
-    }
-
-    async moveBookmarkToFolder(bookmarkId, folderId) {
-        const bookmark = this.bookmarks.find(b => b.id === bookmarkId);
-        if (!bookmark) return;
-        
-        bookmark.folderId = folderId;
-        await this.saveBookmarks();
-        this.renderQuickAccess();
-
-        // Sync to server in background
-        if (api.isAuthenticated()) {
-            api.updateBookmark(bookmarkId, { folderId }).catch(e =>
-                console.log('Background sync (move to folder) failed:', e.message)
-            );
+      // Left click - navigate to URL
+      bookmarkElement.addEventListener("click", (e) => {
+        if (e.button === 0 && !this.isDragging) {
+          window.location.href = bookmark.url;
         }
-    }
+      });
 
-    async createFolder(name) {
-        const folder = {
-            id: Date.now(),
-            name: name,
-            dateCreated: new Date().toISOString()
-        };
-        
-        this.folders.push(folder);
-        await this.saveBookmarks();
-        this.renderQuickAccess();
-
-        // Sync to server in background
-        if (api.isAuthenticated()) {
-            api.createFolder({ name }).then(serverFolder => {
-                // Update local ID to match server-assigned ID
-                const idx = this.folders.findIndex(f => f.id === folder.id);
-                if (idx !== -1) {
-                    this.folders[idx].id = serverFolder.id;
-                    this.saveBookmarks();
-                }
-            }).catch(e =>
-                console.log('Background sync (create folder) failed:', e.message)
-            );
+      // Middle click - open in new background tab
+      bookmarkElement.addEventListener("mousedown", (e) => {
+        if (e.button === 1 && !this.isDragging) {
+          e.preventDefault();
+          chrome.tabs.create({ url: bookmark.url, active: false });
         }
-        
-        return folder;
-    }
+      });
 
-    showCreateFolderModal() {
-        document.getElementById('createFolderModal').classList.remove('hidden');
-        document.getElementById('folderName').focus();
-    }
+      // Right click - show context menu
+      bookmarkElement.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        this.showContextMenu(e, bookmark.id);
+      });
 
-    hideCreateFolderModal() {
-        document.getElementById('createFolderModal').classList.add('hidden');
-        document.getElementById('createFolderForm').reset();
-    }
+      // Drag start
+      bookmarkElement.addEventListener("dragstart", (e) => {
+        this.isDragging = true;
+        this.draggedBookmarkId = bookmark.id;
+        bookmarkElement.style.opacity = "0.5";
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/html", bookmarkElement.outerHTML);
+      });
 
-    async createFolderFromModal() {
-        const folderName = document.getElementById('folderName').value.trim();
-        
-        if (!folderName) return;
-        
-        await this.createFolder(folderName);
-        this.hideCreateFolderModal();
-    }
-
-    showFolderContextMenu(event, folderId) {
-        console.log('showFolderContextMenu called with folderId:', folderId);
-        this.currentFolderId = folderId;
-        const contextMenu = document.getElementById('contextMenu');
-        
-        // Hide bookmark menu items and show folder menu items
-        document.getElementById('editBookmark').classList.add('hidden');
-        document.getElementById('duplicateBookmark').classList.add('hidden');
-        document.getElementById('copyBookmarkUrl').classList.add('hidden');
-        document.getElementById('deleteBookmark').classList.add('hidden');
-        document.getElementById('renameFolder').classList.remove('hidden');
-        document.getElementById('deleteFolder').classList.remove('hidden');
-        
-        // Set z-index based on open modals
-        this.setElementZIndex(contextMenu);
-        
-        // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning
-        contextMenu.style.left = `${event.pageX}px`;
-        contextMenu.style.top = `${event.pageY}px`;
-        contextMenu.classList.remove('hidden');
-        
-        // Adjust position if menu goes off screen
-        const rect = contextMenu.getBoundingClientRect();
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
-        
-        if (rect.right > windowWidth) {
-            contextMenu.style.left = `${event.pageX - rect.width}px`;
-        }
-        if (rect.bottom > windowHeight) {
-            contextMenu.style.top = `${event.pageY - rect.height}px`;
-        }
-    }
-
-    showRenameFolderModal() {
-        const folder = this.folders.find(f => f.id === this.currentFolderId);
-        if (!folder) return;
-        
-        document.getElementById('renameFolderName').value = folder.name;
-        document.getElementById('renameFolderModal').classList.remove('hidden');
-        document.getElementById('renameFolderName').focus();
-        document.getElementById('renameFolderName').select();
-    }
-
-    hideRenameFolderModal() {
-        document.getElementById('renameFolderModal').classList.add('hidden');
-        document.getElementById('renameFolderForm').reset();
-    }
-
-    async renameFolderFromModal() {
-        const newName = document.getElementById('renameFolderName').value.trim();
-        if (!newName || !this.currentFolderId) return;
-        
-        const folder = this.folders.find(f => f.id === this.currentFolderId);
-        if (!folder) return;
-        
-        const folderId = this.currentFolderId;
-        folder.name = newName;
-        await this.saveBookmarks();
-        this.renderQuickAccess();
-        
-        // Update folder modal title if the folder modal is open for this folder
-        if (this.openFolderId === this.currentFolderId) {
-            document.getElementById('folderModalTitle').textContent = newName;
-        }
-        
-        this.hideRenameFolderModal();
-        this.currentFolderId = null;
-
-        // Sync to server in background
-        if (api.isAuthenticated()) {
-            api.updateFolder(folderId, { name: newName }).catch(e =>
-                console.log('Background sync (rename folder) failed:', e.message)
-            );
-        }
-    }
-
-    async deleteFolderWithBookmarks() {
-        if (!this.currentFolderId) return;
-        
-        const folder = this.folders.find(f => f.id === this.currentFolderId);
-        if (!folder) return;
-        
-        const deletedFolderId = this.currentFolderId;
-
-        // Move all bookmarks in this folder back to main view
-        this.bookmarks.forEach(bookmark => {
-            if (bookmark.folderId === this.currentFolderId) {
-                bookmark.folderId = null; // Remove from folder
-            }
-        });
-        
-        // Remove the folder
-        this.folders = this.folders.filter(f => f.id !== this.currentFolderId);
-        
-        // Save changes
-        await this.saveBookmarks();
-        this.renderQuickAccess();
-        
-        // Close folder modal if this folder was open
-        if (this.openFolderId === this.currentFolderId) {
-            this.closeFolderModal();
-        }
-        
-        this.currentFolderId = null;
-
-        // Sync to server in background
-        if (api.isAuthenticated()) {
-            api.deleteFolder(deletedFolderId).catch(e =>
-                console.log('Background sync (delete folder) failed:', e.message)
-            );
-        }
-    }
-
-    showFolderDeleteConfirmation(event) {
-        if (!this.currentFolderId) return;
-        
-        const popup = document.getElementById('deleteConfirmPopup');
-        const folder = this.folders.find(f => f.id === this.currentFolderId);
-        
-        if (!folder) return;
-        
-        // Highlight the folder being deleted
-        this.highlightFolderForDeletion(this.currentFolderId);
-        
-        // Update the confirmation message with the folder name
-        const messageElement = document.getElementById('deleteConfirmMessage');
-        const bookmarkCount = this.bookmarks.filter(b => b.folderId === this.currentFolderId).length;
-        const bookmarkText = bookmarkCount === 1 ? 'bookmark' : 'bookmarks';
-        messageElement.innerHTML = `Are you sure you want to delete folder <strong>${folder.name}</strong>?<br><small class="text-gray-500">${bookmarkCount} ${bookmarkText} will be moved to the main view.</small>`;
-        
-        // Position the popup near the folder being deleted
-        const folderElement = document.querySelector(`[data-folder-id="${this.currentFolderId}"]`);
-        if (folderElement) {
-            const rect = folderElement.getBoundingClientRect();
-            const popupRect = popup.getBoundingClientRect();
-            
-            // Position popup to the right of the folder, or left if not enough space
-            let left = rect.right + 10;
-            let top = rect.top;
-            
-            // Check if popup would go off screen horizontally
-            if (left + 256 > window.innerWidth) { // 256px is popup width (w-64)
-                left = rect.left - 256 - 10;
-            }
-            
-            // Check if popup would go off screen vertically
-            if (top + 100 > window.innerHeight) { // Approximate popup height
-                top = rect.bottom - 100;
-            }
-            
-            // Ensure popup doesn't go above viewport
-            if (top < 0) {
-                top = 10;
-            }
-            
-            // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning  
-            popup.style.left = `${left}px`;
-            popup.style.top = `${top}px`;
-        }
-        
-        // Set z-index based on open modals
-        this.setElementZIndex(popup);
-        
-        popup.classList.remove('hidden');
-    }
-
-    highlightFolderForDeletion(folderId) {
-        // Remove any existing highlights
-        this.removeBookmarkHighlight();
-        this.removeDeleteHighlight();
-        this.removeFolderDeleteHighlight();
-        
-        // Add delete highlight to the current folder
-        const folderElement = document.querySelector(`[data-folder-id="${folderId}"]`);
-        if (folderElement) {
-            folderElement.classList.add('folder-delete-highlighted');
-        }
-    }
-
-    removeFolderDeleteHighlight() {
-        const deleteHighlightedElement = document.querySelector('.folder-delete-highlighted');
-        if (deleteHighlightedElement) {
-            deleteHighlightedElement.classList.remove('folder-delete-highlighted');
-        }
-    }
-
-    setupFolderDragAndDrop() {
-        const folderModal = document.getElementById('folderModal');
-        const modalBackdrop = folderModal; // The backdrop is the modal itself
-        let dragCounter = 0;
-        
-        // Store event handlers for cleanup
-        this.folderDragHandlers = {};
-        
-        // Handle drag enter on the backdrop (outside the modal content)
-        this.folderDragHandlers.dragenter = (e) => {
-            // Only handle if dragging from within folder and target is backdrop
-            if (this.draggedBookmarkId && e.target === modalBackdrop) {
-                e.preventDefault();
-                dragCounter++;
-                this.showFolderDragIndicator();
-            }
-        };
-        
-        // Handle drag over
-        this.folderDragHandlers.dragover = (e) => {
-            if (this.draggedBookmarkId && e.target === modalBackdrop) {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-            }
-        };
-        
-        // Handle drag leave
-        this.folderDragHandlers.dragleave = (e) => {
-            if (this.draggedBookmarkId && e.target === modalBackdrop) {
-                e.preventDefault();
-                dragCounter--;
-                if (dragCounter === 0) {
-                    this.removeFolderDragIndicator();
-                }
-            }
-        };
-        
-        // Handle drop on backdrop
-        this.folderDragHandlers.drop = (e) => {
-            if (this.draggedBookmarkId && e.target === modalBackdrop) {
-                e.preventDefault();
-                dragCounter = 0;
-                this.removeFolderDragIndicator();
-                this.removeBookmarkFromFolder(this.draggedBookmarkId);
-            }
-        };
-        
-        // Add event listeners
-        modalBackdrop.addEventListener('dragenter', this.folderDragHandlers.dragenter);
-        modalBackdrop.addEventListener('dragover', this.folderDragHandlers.dragover);
-        modalBackdrop.addEventListener('dragleave', this.folderDragHandlers.dragleave);
-        modalBackdrop.addEventListener('drop', this.folderDragHandlers.drop);
-    }
-
-    cleanupFolderDragAndDrop() {
-        if (!this.folderDragHandlers) return;
-        
-        const folderModal = document.getElementById('folderModal');
-        
-        // Remove all event listeners
-        folderModal.removeEventListener('dragenter', this.folderDragHandlers.dragenter);
-        folderModal.removeEventListener('dragover', this.folderDragHandlers.dragover);
-        folderModal.removeEventListener('dragleave', this.folderDragHandlers.dragleave);
-        folderModal.removeEventListener('drop', this.folderDragHandlers.drop);
-        
-        this.folderDragHandlers = null;
+      // Drag end
+      bookmarkElement.addEventListener("dragend", (e) => {
+        this.isDragging = false;
+        this.draggedBookmarkId = null;
+        bookmarkElement.style.opacity = "1";
         this.removeFolderDragIndicator();
+      });
+
+      // Handle favicon error
+      const faviconImg = bookmarkElement.querySelector(".bookmark-favicon");
+      const fallbackDiv = bookmarkElement.querySelector(".bookmark-fallback");
+
+      faviconImg.addEventListener("error", () => {
+        faviconImg.style.display = "none";
+        fallbackDiv.style.display = "block";
+      });
+    });
+  }
+
+  async moveBookmarkToFolder(bookmarkId, folderId) {
+    const bookmark = this.bookmarks.find((b) => b.id === bookmarkId);
+    if (!bookmark) return;
+
+    bookmark.folderId = folderId;
+    bookmark.lastUpdated = new Date().toISOString();
+    await this.saveBookmarks();
+    this.renderQuickAccess();
+
+    // Enqueue sync
+    enqueueSync("update_bookmark", { id: bookmarkId, updates: { folderId } });
+  }
+
+  async createFolder(name) {
+    const now = new Date().toISOString();
+    const folder = {
+      id: Date.now(),
+      name: name,
+      dateCreated: now,
+      lastUpdated: now,
+      position: this.folders.length,
+    };
+
+    this.folders.push(folder);
+    await this.saveBookmarks();
+    this.renderQuickAccess();
+
+    // Enqueue sync
+    enqueueSync("create_folder", {
+      localId: folder.id,
+      name: folder.name,
+      position: folder.position,
+    });
+
+    return folder;
+  }
+
+  showCreateFolderModal() {
+    document.getElementById("createFolderModal").classList.remove("hidden");
+    document.getElementById("folderName").focus();
+  }
+
+  hideCreateFolderModal() {
+    document.getElementById("createFolderModal").classList.add("hidden");
+    document.getElementById("createFolderForm").reset();
+  }
+
+  async createFolderFromModal() {
+    const folderName = document.getElementById("folderName").value.trim();
+
+    if (!folderName) return;
+
+    await this.createFolder(folderName);
+    this.hideCreateFolderModal();
+  }
+
+  showFolderContextMenu(event, folderId) {
+    console.log("showFolderContextMenu called with folderId:", folderId);
+    this.currentFolderId = folderId;
+    const contextMenu = document.getElementById("contextMenu");
+
+    // Hide bookmark menu items and show folder menu items
+    document.getElementById("editBookmark").classList.add("hidden");
+    document.getElementById("duplicateBookmark").classList.add("hidden");
+    document.getElementById("copyBookmarkUrl").classList.add("hidden");
+    document.getElementById("deleteBookmark").classList.add("hidden");
+    document.getElementById("renameFolder").classList.remove("hidden");
+    document.getElementById("deleteFolder").classList.remove("hidden");
+
+    // Set z-index based on open modals
+    this.setElementZIndex(contextMenu);
+
+    // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning
+    contextMenu.style.left = `${event.pageX}px`;
+    contextMenu.style.top = `${event.pageY}px`;
+    contextMenu.classList.remove("hidden");
+
+    // Adjust position if menu goes off screen
+    const rect = contextMenu.getBoundingClientRect();
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+
+    if (rect.right > windowWidth) {
+      contextMenu.style.left = `${event.pageX - rect.width}px`;
+    }
+    if (rect.bottom > windowHeight) {
+      contextMenu.style.top = `${event.pageY - rect.height}px`;
+    }
+  }
+
+  showRenameFolderModal() {
+    const folder = this.folders.find((f) => f.id === this.currentFolderId);
+    if (!folder) return;
+
+    document.getElementById("renameFolderName").value = folder.name;
+    document.getElementById("renameFolderModal").classList.remove("hidden");
+    document.getElementById("renameFolderName").focus();
+    document.getElementById("renameFolderName").select();
+  }
+
+  hideRenameFolderModal() {
+    document.getElementById("renameFolderModal").classList.add("hidden");
+    document.getElementById("renameFolderForm").reset();
+  }
+
+  async renameFolderFromModal() {
+    const newName = document.getElementById("renameFolderName").value.trim();
+    if (!newName || !this.currentFolderId) return;
+
+    const folder = this.folders.find((f) => f.id === this.currentFolderId);
+    if (!folder) return;
+
+    const folderId = this.currentFolderId;
+    folder.name = newName;
+    folder.lastUpdated = new Date().toISOString();
+    await this.saveBookmarks();
+    this.renderQuickAccess();
+
+    // Update folder modal title if the folder modal is open for this folder
+    if (this.openFolderId === this.currentFolderId) {
+      document.getElementById("folderModalTitle").textContent = newName;
     }
 
-    showFolderDragIndicator() {
-        const folderModal = document.getElementById('folderModal');
-        folderModal.classList.add('bg-blue-100/20');
-        
-        // Add visual indicator
-        if (!document.getElementById('folderDragIndicator')) {
-            const indicator = document.createElement('div');
-            indicator.id = 'folderDragIndicator';
-            indicator.className = 'fixed inset-0 pointer-events-none flex items-center justify-center z-50';
-            indicator.innerHTML = `
+    this.hideRenameFolderModal();
+    this.currentFolderId = null;
+
+    // Enqueue sync
+    enqueueSync("update_folder", { id: folderId, updates: { name: newName } });
+  }
+
+  async deleteFolderWithBookmarks() {
+    if (!this.currentFolderId) return;
+
+    const folder = this.folders.find((f) => f.id === this.currentFolderId);
+    if (!folder) return;
+
+    const deletedFolderId = this.currentFolderId;
+
+    // Move all bookmarks in this folder back to main view
+    this.bookmarks.forEach((bookmark) => {
+      if (bookmark.folderId === this.currentFolderId) {
+        bookmark.folderId = null; // Remove from folder
+      }
+    });
+
+    // Remove the folder
+    this.folders = this.folders.filter((f) => f.id !== this.currentFolderId);
+
+    // Save changes
+    await this.saveBookmarks();
+    this.renderQuickAccess();
+
+    // Close folder modal if this folder was open
+    if (this.openFolderId === this.currentFolderId) {
+      this.closeFolderModal();
+    }
+
+    this.currentFolderId = null;
+
+    // Enqueue sync
+    enqueueSync("delete_folder", { id: deletedFolderId });
+  }
+
+  showFolderDeleteConfirmation(event) {
+    if (!this.currentFolderId) return;
+
+    const popup = document.getElementById("deleteConfirmPopup");
+    const folder = this.folders.find((f) => f.id === this.currentFolderId);
+
+    if (!folder) return;
+
+    // Highlight the folder being deleted
+    this.highlightFolderForDeletion(this.currentFolderId);
+
+    // Update the confirmation message with the folder name
+    const messageElement = document.getElementById("deleteConfirmMessage");
+    const bookmarkCount = this.bookmarks.filter(
+      (b) => b.folderId === this.currentFolderId,
+    ).length;
+    const bookmarkText = bookmarkCount === 1 ? "bookmark" : "bookmarks";
+    messageElement.innerHTML = `Are you sure you want to delete folder <strong>${folder.name}</strong>?<br><small class="text-gray-500">${bookmarkCount} ${bookmarkText} will be moved to the main view.</small>`;
+
+    // Position the popup near the folder being deleted
+    const folderElement = document.querySelector(
+      `[data-folder-id="${this.currentFolderId}"]`,
+    );
+    if (folderElement) {
+      const rect = folderElement.getBoundingClientRect();
+      const popupRect = popup.getBoundingClientRect();
+
+      // Position popup to the right of the folder, or left if not enough space
+      let left = rect.right + 10;
+      let top = rect.top;
+
+      // Check if popup would go off screen horizontally
+      if (left + 256 > window.innerWidth) {
+        // 256px is popup width (w-64)
+        left = rect.left - 256 - 10;
+      }
+
+      // Check if popup would go off screen vertically
+      if (top + 100 > window.innerHeight) {
+        // Approximate popup height
+        top = rect.bottom - 100;
+      }
+
+      // Ensure popup doesn't go above viewport
+      if (top < 0) {
+        top = 10;
+      }
+
+      // Note: Dynamic positioning requires style attributes since Tailwind can't handle pixel-perfect dynamic positioning
+      popup.style.left = `${left}px`;
+      popup.style.top = `${top}px`;
+    }
+
+    // Set z-index based on open modals
+    this.setElementZIndex(popup);
+
+    popup.classList.remove("hidden");
+  }
+
+  highlightFolderForDeletion(folderId) {
+    // Remove any existing highlights
+    this.removeBookmarkHighlight();
+    this.removeDeleteHighlight();
+    this.removeFolderDeleteHighlight();
+
+    // Add delete highlight to the current folder
+    const folderElement = document.querySelector(
+      `[data-folder-id="${folderId}"]`,
+    );
+    if (folderElement) {
+      folderElement.classList.add("folder-delete-highlighted");
+    }
+  }
+
+  removeFolderDeleteHighlight() {
+    const deleteHighlightedElement = document.querySelector(
+      ".folder-delete-highlighted",
+    );
+    if (deleteHighlightedElement) {
+      deleteHighlightedElement.classList.remove("folder-delete-highlighted");
+    }
+  }
+
+  setupFolderDragAndDrop() {
+    const folderModal = document.getElementById("folderModal");
+    const modalBackdrop = folderModal; // The backdrop is the modal itself
+    let dragCounter = 0;
+
+    // Store event handlers for cleanup
+    this.folderDragHandlers = {};
+
+    // Handle drag enter on the backdrop (outside the modal content)
+    this.folderDragHandlers.dragenter = (e) => {
+      // Only handle if dragging from within folder and target is backdrop
+      if (this.draggedBookmarkId && e.target === modalBackdrop) {
+        e.preventDefault();
+        dragCounter++;
+        this.showFolderDragIndicator();
+      }
+    };
+
+    // Handle drag over
+    this.folderDragHandlers.dragover = (e) => {
+      if (this.draggedBookmarkId && e.target === modalBackdrop) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }
+    };
+
+    // Handle drag leave
+    this.folderDragHandlers.dragleave = (e) => {
+      if (this.draggedBookmarkId && e.target === modalBackdrop) {
+        e.preventDefault();
+        dragCounter--;
+        if (dragCounter === 0) {
+          this.removeFolderDragIndicator();
+        }
+      }
+    };
+
+    // Handle drop on backdrop
+    this.folderDragHandlers.drop = (e) => {
+      if (this.draggedBookmarkId && e.target === modalBackdrop) {
+        e.preventDefault();
+        dragCounter = 0;
+        this.removeFolderDragIndicator();
+        this.removeBookmarkFromFolder(this.draggedBookmarkId);
+      }
+    };
+
+    // Add event listeners
+    modalBackdrop.addEventListener(
+      "dragenter",
+      this.folderDragHandlers.dragenter,
+    );
+    modalBackdrop.addEventListener(
+      "dragover",
+      this.folderDragHandlers.dragover,
+    );
+    modalBackdrop.addEventListener(
+      "dragleave",
+      this.folderDragHandlers.dragleave,
+    );
+    modalBackdrop.addEventListener("drop", this.folderDragHandlers.drop);
+  }
+
+  cleanupFolderDragAndDrop() {
+    if (!this.folderDragHandlers) return;
+
+    const folderModal = document.getElementById("folderModal");
+
+    // Remove all event listeners
+    folderModal.removeEventListener(
+      "dragenter",
+      this.folderDragHandlers.dragenter,
+    );
+    folderModal.removeEventListener(
+      "dragover",
+      this.folderDragHandlers.dragover,
+    );
+    folderModal.removeEventListener(
+      "dragleave",
+      this.folderDragHandlers.dragleave,
+    );
+    folderModal.removeEventListener("drop", this.folderDragHandlers.drop);
+
+    this.folderDragHandlers = null;
+    this.removeFolderDragIndicator();
+  }
+
+  showFolderDragIndicator() {
+    const folderModal = document.getElementById("folderModal");
+    folderModal.classList.add("bg-blue-100/20");
+
+    // Add visual indicator
+    if (!document.getElementById("folderDragIndicator")) {
+      const indicator = document.createElement("div");
+      indicator.id = "folderDragIndicator";
+      indicator.className =
+        "fixed inset-0 pointer-events-none flex items-center justify-center z-50";
+      indicator.innerHTML = `
                 <div class="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-lg text-lg font-semibold">
                     Drop here to remove from folder
                 </div>
             `;
-            document.body.appendChild(indicator);
-        }
+      document.body.appendChild(indicator);
     }
+  }
 
-    removeFolderDragIndicator() {
-        const folderModal = document.getElementById('folderModal');
-        folderModal.classList.remove('bg-blue-100/20');
-        
-        const indicator = document.getElementById('folderDragIndicator');
-        if (indicator) {
-            indicator.remove();
-        }
+  removeFolderDragIndicator() {
+    const folderModal = document.getElementById("folderModal");
+    folderModal.classList.remove("bg-blue-100/20");
+
+    const indicator = document.getElementById("folderDragIndicator");
+    if (indicator) {
+      indicator.remove();
     }
+  }
 
-    async removeBookmarkFromFolder(bookmarkId) {
-        const bookmark = this.bookmarks.find(b => b.id === bookmarkId);
-        if (!bookmark) return;
-        
-        // Remove from folder (set folderId to null)
-        bookmark.folderId = null;
-        await this.saveBookmarks();
-        
-        // Re-render both the folder contents and main view
-        this.renderFolderBookmarks(this.openFolderId);
-        this.renderQuickAccess();
+  async removeBookmarkFromFolder(bookmarkId) {
+    const bookmark = this.bookmarks.find((b) => b.id === bookmarkId);
+    if (!bookmark) return;
 
-        // Sync to server in background
-        if (api.isAuthenticated()) {
-            api.updateBookmark(bookmarkId, { folderId: null }).catch(e =>
-                console.log('Background sync (remove from folder) failed:', e.message)
-            );
-        }
-    }
+    // Remove from folder (set folderId to null)
+    bookmark.folderId = null;
+    bookmark.lastUpdated = new Date().toISOString();
+    await this.saveBookmarks();
 
-    // Removed unused bookmark card and list rendering methods
+    // Re-render both the folder contents and main view
+    this.renderFolderBookmarks(this.openFolderId);
+    this.renderQuickAccess();
+
+    // Enqueue sync
+    enqueueSync("update_bookmark", {
+      id: bookmarkId,
+      updates: { folderId: null },
+    });
+  }
+
+  // Removed unused bookmark card and list rendering methods
 }
 
 // Initialize the bookmark manager when the page loads
 let bookmarkManager;
-document.addEventListener('DOMContentLoaded', () => {
-    bookmarkManager = new BookmarkManager();
+document.addEventListener("DOMContentLoaded", () => {
+  bookmarkManager = new BookmarkManager();
 });
