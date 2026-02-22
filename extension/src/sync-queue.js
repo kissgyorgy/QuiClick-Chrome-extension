@@ -14,7 +14,7 @@ const SYNC_API_BASE_URL = "https://local.fancyauth.com:8000";
  *   'reorder', 'update_settings', 'full_push'
  * @param {object} payload - Operation-specific data
  */
-async function enqueueSync(type, payload) {
+export async function enqueueSync(type, payload) {
   const data = await chrome.storage.local.get("syncQueue");
   const queue = data.syncQueue || [];
 

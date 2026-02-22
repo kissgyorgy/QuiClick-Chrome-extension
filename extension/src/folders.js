@@ -1,4 +1,5 @@
 // Folder management: CRUD, modal, rendering, drag & drop
+import { enqueueSync } from "./sync-queue.js";
 
 export const folderMethods = {
   openFolder(folderId) {

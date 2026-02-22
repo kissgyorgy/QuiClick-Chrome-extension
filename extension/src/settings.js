@@ -1,4 +1,5 @@
 // Settings, import/export
+import { enqueueSync } from "./sync-queue.js";
 
 export const settingsMethods = {
   async loadSettings() {

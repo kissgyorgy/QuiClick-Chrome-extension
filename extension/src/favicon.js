@@ -1,4 +1,5 @@
 // Favicon fetching, caching, displaying, and selecting
+import { enqueueSync } from "./sync-queue.js";
 
 export const faviconMethods = {
   extractTitleFromDocument(doc) {

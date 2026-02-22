@@ -302,4 +302,4 @@ class QuiClickAPI {
 }
 
 // Singleton instance
-const api = new QuiClickAPI();
+export const api = new QuiClickAPI();

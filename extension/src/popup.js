@@ -1,6 +1,8 @@
 // Popup script for QuiClick extension
 // Handles the bookmark addition form in the popup
 
+import { enqueueSync } from "./sync-queue.js";
+
 class QuiClickPopup {
   constructor() {
     this.selectedFavicon = null;

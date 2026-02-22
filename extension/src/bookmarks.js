@@ -1,4 +1,5 @@
 // Bookmark CRUD, rendering, and reordering
+import { enqueueSync } from "./sync-queue.js";
 
 export const bookmarkMethods = {
   async addBookmarkFromDrop(title, url) {

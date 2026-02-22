@@ -1,7 +1,8 @@
 // QuiClick Background Service Worker
 // Sync engine: queue processor, delta pull, exponential backoff, auth, ID mapping.
 
-importScripts("api.js", "sync-queue.js");
+import { api } from "./api.js";
+import { enqueueSync } from "./sync-queue.js";
 
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_CAP_MS = 30 * 60 * 1000; // 30 minutes
