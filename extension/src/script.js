@@ -3,6 +3,7 @@ import { bookmarkMethods } from "./bookmarks.js";
 import { folderMethods } from "./folders.js";
 import { uiMethods } from "./ui.js";
 import { settingsMethods } from "./settings.js";
+import { api } from "./api.js";
 
 class BookmarkManager {
   constructor() {
@@ -84,7 +85,7 @@ class BookmarkManager {
 
   setupAuthListeners() {
     document.getElementById("loginBtn").addEventListener("click", () => {
-      const loginUrl = `${SYNC_API_BASE_URL}/auth/login`;
+      const loginUrl = api.getLoginUrl();
       window.open(loginUrl, "_blank", "width=500,height=600");
       // Signal background worker to poll for auth
       chrome.storage.local.set({ authAction: "login_started" });

@@ -80,7 +80,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // ─── Delta Pull ────────────────────────────────────────────────────────────
 
-async function pullChanges() {
+async function pullChanges({ force = false } = {}) {
   const storage = await chrome.storage.local.get([
     "lastPullDate",
     "authState",
@@ -88,6 +88,12 @@ async function pullChanges() {
     "folders",
     "bookmarkSettings",
   ]);
+
+  // Skip pull if user is not authenticated — no point hitting the server
+  // (unless forced, e.g. during login polling)
+  if (!force && !storage.authState?.authenticated) {
+    return;
+  }
 
   const ifModifiedSince = storage.lastPullDate || null;
 
@@ -531,7 +537,7 @@ async function handleLoginCheck() {
   const interval = setInterval(async () => {
     attempts++;
     try {
-      await pullChanges();
+      await pullChanges({ force: true });
       const { authState } = await chrome.storage.local.get("authState");
       if (authState?.authenticated) {
         clearInterval(interval);
