@@ -1,8 +1,21 @@
 import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
+import { cpSync } from "fs";
+
+function copyStatic() {
+  return {
+    name: "copy-static",
+    writeBundle() {
+      cpSync("icons", "dist/icons", { recursive: true });
+      cpSync("src/newtab.html", "dist/newtab.html");
+      cpSync("src/popup.html", "dist/popup.html");
+      cpSync("manifest.json", "dist/manifest.json");
+    },
+  };
+}
 
 export default defineConfig({
-  plugins: [tailwindcss()],
+  plugins: [tailwindcss(), copyStatic()],
   build: {
     emptyOutDir: true,
     minify: true,

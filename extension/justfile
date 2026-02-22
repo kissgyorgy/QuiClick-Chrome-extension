@@ -1,10 +1,10 @@
-# Build everything (JS + CSS) with Vite
+# Build everything (JS + CSS + static files) with Vite
 build:
     bunx vite build
 
 # Package extension for Chrome Web Store
 package: build
-    zip -r quiclick-chrome-extension.zip manifest.json newtab.html popup.html dist/ styles.css favicon.svg icon-16.png icon-32.png icon-48.png icon-128.png
+    cd dist && zip -r ../quiclick-chrome-extension.zip .
 
 # Clean build and repackage
 package-clean:
