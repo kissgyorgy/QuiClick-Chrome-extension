@@ -4,14 +4,14 @@ build-js:
 
 # Build Tailwind CSS
 build-css:
-    bunx @tailwindcss/cli -i ./src/main.css -o ./tailwind.css --nowatch
+    bunx @tailwindcss/cli -i ./src/tailwind.css -o ./dist/main.css --nowatch
 
 # Build everything
 build: build-js build-css
 
 # Package extension for Chrome Web Store
 package: build
-    zip -r quiclick-chrome-extension.zip manifest.json newtab.html popup.html api.js sync-queue.js dist/script.js popup.js background.js tailwind.css styles.css favicon.svg icon-16.png icon-32.png icon-48.png icon-128.png
+    zip -r quiclick-chrome-extension.zip manifest.json newtab.html popup.html api.js sync-queue.js dist/script.js popup.js background.js dist/main.css styles.css favicon.svg icon-16.png icon-32.png icon-48.png icon-128.png
 
 # Clean build and repackage
 package-clean:
