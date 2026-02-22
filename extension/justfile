@@ -1,0 +1,12 @@
+# Build Tailwind CSS
+build-css:
+    bunx @tailwindcss/cli -i ./src/main.css -o ./tailwind.css --nowatch
+
+# Package extension for Chrome Web Store
+package: build-css
+    zip -r quiclick-chrome-extension.zip manifest.json newtab.html popup.html api.js script.js popup.js background.js tailwind.css styles.css favicon.svg icon-16.png icon-32.png icon-48.png icon-128.png
+
+# Clean build and repackage
+package-clean:
+    rm -f quiclick-chrome-extension.zip
+    just extension::package

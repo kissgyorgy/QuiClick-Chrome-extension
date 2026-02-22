@@ -10,7 +10,7 @@
     QUICLICK_DATA_DIR = "data";
   };
 
-  packages = [ ];
+  packages = [ pkgs.just ];
 
   languages.python = {
     enable = true;
