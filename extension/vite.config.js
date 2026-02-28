@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
+import preact from "@preact/preset-vite";
 import { cpSync } from "fs";
 
 function copyStatic() {
@@ -15,15 +16,15 @@ function copyStatic() {
 }
 
 export default defineConfig({
-  plugins: [tailwindcss(), copyStatic()],
+  plugins: [preact(), tailwindcss(), copyStatic()],
   build: {
     emptyOutDir: true,
     minify: true,
     outDir: "dist",
     rollupOptions: {
       input: {
-        script: "src/script.js",
-        popup: "src/popup.js",
+        newtab: "src/newtab.jsx",
+        popup: "src/popup.jsx",
         background: "src/background.js",
         main: "src/tailwind.css",
       },

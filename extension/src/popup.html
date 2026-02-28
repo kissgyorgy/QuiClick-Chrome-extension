@@ -18,108 +18,10 @@
       .popup-content {
         padding: 20px;
       }
-
-      .favicon-option {
-        width: 32px;
-        height: 32px;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 2px solid transparent;
-      }
-
-      .favicon-option:hover {
-        transform: scale(1.1);
-        border-color: var(--color-custom-accent);
-      }
-
-      .favicon-option.selected {
-        border-color: var(--color-custom-accent);
-        background-color: rgba(59, 130, 246, 0.1);
-      }
-
-      .favicon-option img {
-        width: 24px;
-        height: 24px;
-        border-radius: 2px;
-      }
-
-      .favicon-error {
-        border-color: #ef4444 !important;
-        background-color: #fef2f2 !important;
-        opacity: 0.7;
-      }
-
-      .loading {
-        opacity: 0.5;
-        pointer-events: none;
-      }
     </style>
   </head>
   <body>
-    <div class="popup-content">
-      <h3 class="text-lg font-semibold text-custom-text mb-4">
-        Add to QuiClick
-      </h3>
-      <form id="addBookmarkForm">
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-custom-text mb-2"
-            >Title</label
-          >
-          <input
-            type="text"
-            id="bookmarkTitle"
-            class="w-full px-3 py-2 border border-custom-border rounded-lg focus:outline-none focus:ring-2 focus:ring-custom-accent focus:border-transparent"
-            autocomplete="off"
-            required
-          />
-        </div>
-        <div class="mb-6">
-          <label class="block text-sm font-medium text-custom-text mb-2"
-            >URL</label
-          >
-          <input
-            type="url"
-            id="bookmarkUrl"
-            class="w-full px-3 py-2 border border-custom-border rounded-lg focus:outline-none focus:ring-2 focus:ring-custom-accent focus:border-transparent"
-            autocomplete="off"
-            required
-          />
-        </div>
-        <div id="faviconSelection" class="mb-6 hidden">
-          <label class="block text-sm font-medium text-custom-text mb-2"
-            >Choose Favicon</label
-          >
-          <div
-            id="faviconOptions"
-            class="grid grid-cols-6 gap-2 p-3 border border-custom-border rounded-lg bg-gray-50"
-          >
-            <div class="text-sm text-gray-500 col-span-6 text-center">
-              Loading favicon options...
-            </div>
-          </div>
-        </div>
-        <div class="flex space-x-3">
-          <button
-            type="button"
-            id="cancelBtn"
-            class="flex-1 px-3 py-2 border border-custom-border rounded-lg text-custom-text hover:bg-gray-50 transition-colors cursor-pointer font-bold text-sm"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            id="addBtn"
-            class="flex-1 px-3 py-2 bg-custom-accent text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer font-bold text-sm"
-          >
-            Add Bookmark
-          </button>
-        </div>
-      </form>
-    </div>
+    <div id="app"></div>
     <script type="module" src="popup.js"></script>
   </body>
 </html>

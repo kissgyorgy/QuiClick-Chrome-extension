@@ -9,5 +9,10 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "@preact/preset-vite": "^2.10.3",
+    "@preact/signals": "^2.8.1",
+    "preact": "^10.28.4"
   }
 }

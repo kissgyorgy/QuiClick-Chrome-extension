@@ -13,26 +13,62 @@
 
 body {
   background:
-    radial-gradient(ellipse 100% 80% at 50% 0%, rgba(186, 230, 253, 0.6) 0%, transparent 50%),
-    radial-gradient(ellipse 80% 60% at 20% 80%, rgba(165, 220, 250, 0.4) 0%, transparent 50%),
-    radial-gradient(ellipse 60% 50% at 90% 50%, rgba(147, 210, 245, 0.3) 0%, transparent 50%),
+    radial-gradient(
+      ellipse 100% 80% at 50% 0%,
+      rgba(186, 230, 253, 0.6) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 80% 60% at 20% 80%,
+      rgba(165, 220, 250, 0.4) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 60% 50% at 90% 50%,
+      rgba(147, 210, 245, 0.3) 0%,
+      transparent 50%
+    ),
     linear-gradient(180deg, #e0f2fe 0%, #e8f4fc 30%, #f0f9ff 70%, #e8f4fc 100%);
   min-height: 100vh;
 }
 
 /* Additional grid column classes for tiles per row setting */
-.grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.grid-cols-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.grid-cols-8 { grid-template-columns: repeat(8, minmax(0, 1fr)); }
-.grid-cols-9 { grid-template-columns: repeat(9, minmax(0, 1fr)); }
-.grid-cols-10 { grid-template-columns: repeat(10, minmax(0, 1fr)); }
-.grid-cols-11 { grid-template-columns: repeat(11, minmax(0, 1fr)); }
-.grid-cols-12 { grid-template-columns: repeat(12, minmax(0, 1fr)); }
-.grid-cols-13 { grid-template-columns: repeat(13, minmax(0, 1fr)); }
-.grid-cols-14 { grid-template-columns: repeat(14, minmax(0, 1fr)); }
-.grid-cols-15 { grid-template-columns: repeat(15, minmax(0, 1fr)); }
+.grid-cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.grid-cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.grid-cols-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.grid-cols-7 {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.grid-cols-8 {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+.grid-cols-9 {
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+}
+.grid-cols-10 {
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+}
+.grid-cols-11 {
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+}
+.grid-cols-12 {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+.grid-cols-13 {
+  grid-template-columns: repeat(13, minmax(0, 1fr));
+}
+.grid-cols-14 {
+  grid-template-columns: repeat(14, minmax(0, 1fr));
+}
+.grid-cols-15 {
+  grid-template-columns: repeat(15, minmax(0, 1fr));
+}
 
 .plus-icon {
   font-size: 4rem;
@@ -51,8 +87,12 @@ body {
 
 /* Modal Animations */
 @keyframes modalFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes modalSlideIn {
@@ -67,8 +107,12 @@ body {
 }
 
 @keyframes modalFadeOut {
-  from { opacity: 1; }
-  to { opacity: 0; }
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 @keyframes modalSlideOut {
@@ -108,8 +152,8 @@ body {
 .modal-content {
   background: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.75) 0%,
-    rgba(240, 249, 255, 0.8) 100%
+    rgba(255, 255, 255, 0.97) 0%,
+    rgba(240, 249, 255, 0.98) 100%
   );
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -129,8 +173,8 @@ body {
 .context-menu {
   background: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.8) 0%,
-    rgba(240, 249, 255, 0.85) 100%
+    rgba(255, 255, 255, 0.97) 0%,
+    rgba(240, 249, 255, 0.98) 100%
   );
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -146,6 +190,15 @@ body {
 .context-menu button {
   color: #1e3a5f;
   transition: all 0.2s ease;
+}
+
+.context-menu button.btn-delete {
+  color: #dc2626 !important;
+}
+
+.context-menu button.btn-delete:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c !important;
 }
 
 .context-menu button:hover {
@@ -180,8 +233,8 @@ body {
 .delete-popup {
   background: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.8) 0%,
-    rgba(254, 242, 242, 0.85) 100%
+    rgba(255, 255, 255, 0.97) 0%,
+    rgba(254, 242, 242, 0.98) 100%
   );
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -201,8 +254,8 @@ body {
 .edit-modal {
   background: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.75) 0%,
-    rgba(240, 249, 255, 0.8) 100%
+    rgba(255, 255, 255, 0.97) 0%,
+    rgba(240, 249, 255, 0.98) 100%
   );
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -318,7 +371,7 @@ input:checked ~ .toggle-dot {
 }
 
 .tile-3d::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(
@@ -332,7 +385,7 @@ input:checked ~ .toggle-dot {
 }
 
 .tile-3d::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: -100%;
@@ -365,8 +418,12 @@ input:checked ~ .toggle-dot {
 }
 
 @keyframes glass-shine {
-  0% { left: -100%; }
-  100% { left: 100%; }
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
 }
 
 .tile-3d:active {
@@ -475,11 +532,7 @@ header h1 {
 header button,
 .modal-content button[type="submit"],
 #confirmImportBtn {
-  background: linear-gradient(
-    135deg,
-    #38bdf8 0%,
-    #0ea5e9 100%
-  ) !important;
+  background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%) !important;
   border: 1px solid rgba(125, 211, 252, 0.5) !important;
   box-shadow:
     0 4px 14px rgba(14, 165, 233, 0.25),
@@ -491,11 +544,7 @@ header button,
 header button:hover,
 .modal-content button[type="submit"]:hover,
 #confirmImportBtn:hover {
-  background: linear-gradient(
-    135deg,
-    #7dd3fc 0%,
-    #38bdf8 100%
-  ) !important;
+  background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%) !important;
   box-shadow:
     0 8px 20px rgba(14, 165, 233, 0.3),
     0 4px 8px rgba(14, 165, 233, 0.2),
@@ -503,12 +552,9 @@ header button:hover,
   transform: translateY(-1px);
 }
 
-#createFolderBtn {
-  background: linear-gradient(
-    135deg,
-    #fbbf24 0%,
-    #f59e0b 100%
-  ) !important;
+#createFolderBtn,
+header button.btn-create-folder {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
   border: 1px solid rgba(253, 224, 71, 0.5) !important;
   box-shadow:
     0 4px 14px rgba(245, 158, 11, 0.25),
@@ -516,12 +562,9 @@ header button:hover,
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
-#createFolderBtn:hover {
-  background: linear-gradient(
-    135deg,
-    #fcd34d 0%,
-    #fbbf24 100%
-  ) !important;
+#createFolderBtn:hover,
+header button.btn-create-folder:hover {
+  background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%) !important;
   box-shadow:
     0 8px 20px rgba(245, 158, 11, 0.3),
     0 4px 8px rgba(245, 158, 11, 0.2),
@@ -529,11 +572,7 @@ header button:hover,
 }
 
 #confirmDeleteBtn {
-  background: linear-gradient(
-    135deg,
-    #f87171 0%,
-    #ef4444 100%
-  ) !important;
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%) !important;
   border: 1px solid rgba(252, 165, 165, 0.5) !important;
   box-shadow:
     0 4px 14px rgba(239, 68, 68, 0.25),
@@ -542,11 +581,7 @@ header button:hover,
 }
 
 #confirmDeleteBtn:hover {
-  background: linear-gradient(
-    135deg,
-    #fca5a5 0%,
-    #f87171 100%
-  ) !important;
+  background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%) !important;
   box-shadow:
     0 8px 20px rgba(239, 68, 68, 0.3),
     0 4px 8px rgba(239, 68, 68, 0.2),
@@ -692,11 +727,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 /* Export/Import Buttons */
 #exportBtn {
-  background: linear-gradient(
-    135deg,
-    #4ade80 0%,
-    #22c55e 100%
-  ) !important;
+  background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%) !important;
   border: 1px solid rgba(134, 239, 172, 0.5) !important;
   box-shadow:
     0 4px 14px rgba(34, 197, 94, 0.25),
@@ -705,11 +736,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 #exportBtn:hover {
-  background: linear-gradient(
-    135deg,
-    #86efac 0%,
-    #4ade80 100%
-  ) !important;
+  background: linear-gradient(135deg, #86efac 0%, #4ade80 100%) !important;
   box-shadow:
     0 8px 20px rgba(34, 197, 94, 0.3),
     0 4px 8px rgba(34, 197, 94, 0.2),
@@ -717,11 +744,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 #importBtn {
-  background: linear-gradient(
-    135deg,
-    #38bdf8 0%,
-    #0ea5e9 100%
-  ) !important;
+  background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%) !important;
   border: 1px solid rgba(125, 211, 252, 0.5) !important;
   box-shadow:
     0 4px 14px rgba(14, 165, 233, 0.25),
@@ -730,11 +753,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 #importBtn:hover {
-  background: linear-gradient(
-    135deg,
-    #7dd3fc 0%,
-    #38bdf8 100%
-  ) !important;
+  background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%) !important;
   box-shadow:
     0 8px 20px rgba(14, 165, 233, 0.3),
     0 4px 8px rgba(14, 165, 233, 0.2),
@@ -781,8 +800,8 @@ input[type="range"]::-webkit-slider-thumb:hover {
 #folderModal .modal-content {
   background: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.8) 0%,
-    rgba(240, 249, 255, 0.85) 100%
+    rgba(255, 255, 255, 0.97) 0%,
+    rgba(240, 249, 255, 0.98) 100%
   );
 }
 
@@ -820,11 +839,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 /* Folder Icon Inner Container */
 .tile-3d-folder .tile-icon > div {
-  background: linear-gradient(
-    145deg,
-    #fbbf24 0%,
-    #f59e0b 100%
-  ) !important;
+  background: linear-gradient(145deg, #fbbf24 0%, #f59e0b 100%) !important;
   box-shadow:
     0 2px 8px rgba(245, 158, 11, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
@@ -832,11 +847,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 /* Bookmark Fallback Icon */
 .bookmark-fallback {
-  background: linear-gradient(
-    145deg,
-    #38bdf8 0%,
-    #0ea5e9 100%
-  ) !important;
+  background: linear-gradient(145deg, #38bdf8 0%, #0ea5e9 100%) !important;
   box-shadow:
     0 2px 8px rgba(14, 165, 233, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
@@ -844,11 +855,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 /* Header Icon Background */
 header .bg-custom-accent {
-  background: linear-gradient(
-    135deg,
-    #38bdf8 0%,
-    #0ea5e9 100%
-  ) !important;
+  background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%) !important;
   box-shadow:
     0 2px 8px rgba(14, 165, 233, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
