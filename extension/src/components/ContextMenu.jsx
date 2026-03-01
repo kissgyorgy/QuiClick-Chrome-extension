@@ -7,7 +7,6 @@ import {
   notification,
 } from "../state/store.js";
 import { copyBookmarkUrl } from "../hooks/use-bookmarks.js";
-import { duplicateBookmark } from "../hooks/use-bookmarks.js";
 
 function hideContextMenu() {
   contextMenu.value = { ...contextMenu.peek(), visible: false };
@@ -48,15 +47,12 @@ export function ContextMenu() {
     activeModal.value = "editBookmark";
   }
 
-  async function handleDuplicate() {
+  function handleDuplicate() {
     hideContextMenu();
-    const bookmarkId = currentBookmarkId.peek();
-    if (!bookmarkId) return;
-    const duplicated = await duplicateBookmark(bookmarkId);
-    if (duplicated) {
-      currentBookmarkId.value = duplicated.id;
-      activeModal.value = "duplicateBookmark";
-    }
+    // currentBookmarkId is already set to the original bookmark's ID
+    // (set when the context menu was opened). The duplicate will be
+    // created when the user clicks Save in the modal.
+    activeModal.value = "duplicateBookmark";
   }
 
   async function handleCopyUrl() {

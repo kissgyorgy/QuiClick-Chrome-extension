@@ -121,7 +121,7 @@ export async function updateBookmark(
   });
 }
 
-export async function duplicateBookmark(bookmarkId) {
+export function duplicateBookmark(bookmarkId, overrides = {}) {
   const current = [...bookmarks.peek()];
   const original = current.find((b) => b.id === bookmarkId);
   if (!original) return null;
@@ -129,6 +129,7 @@ export async function duplicateBookmark(bookmarkId) {
   const now = new Date().toISOString();
   const duplicated = {
     ...original,
+    ...overrides,
     id: Date.now(),
     dateAdded: now,
     lastUpdated: now,
@@ -137,7 +138,7 @@ export async function duplicateBookmark(bookmarkId) {
   const originalIndex = current.findIndex((b) => b.id === bookmarkId);
   current.splice(originalIndex + 1, 0, duplicated);
   bookmarks.value = current;
-  await persistBookmarks();
+  persistBookmarks(); // fire-and-forget — don't block the UI
 
   enqueueSync("create_bookmark", {
     localId: duplicated.id,

@@ -1,11 +1,6 @@
 import { useState, useEffect, useRef } from "preact/hooks";
-import {
-  activeModal,
-  bookmarks,
-  currentBookmarkId,
-  openFolderId,
-} from "../state/store.js";
-import { updateBookmark, deleteBookmarkById } from "../hooks/use-bookmarks.js";
+import { activeModal, bookmarks, currentBookmarkId } from "../state/store.js";
+import { updateBookmark, duplicateBookmark } from "../hooks/use-bookmarks.js";
 import { useFaviconPicker } from "../hooks/use-favicons.js";
 import { FaviconPicker } from "./FaviconPicker.jsx";
 
@@ -20,7 +15,11 @@ export function EditBookmarkModal() {
 
 function EditBookmarkForm({ isDuplicate }) {
   const bookmarkId = currentBookmarkId.value;
-  const bookmark = bookmarks.value.find((b) => b.id === bookmarkId);
+  // Snapshot the bookmark on mount so background sync ID changes can't pull
+  // the rug out from under the form while it's open.
+  const [bookmark] = useState(
+    () => bookmarks.peek().find((b) => b.id === bookmarkId) || null,
+  );
 
   const [title, setTitle] = useState(bookmark?.title || "");
   const [url, setUrl] = useState(bookmark?.url || "");
@@ -52,23 +51,32 @@ function EditBookmarkForm({ isDuplicate }) {
     modalRef.current.style.top = `${top}px`;
   }, [bookmarkId]);
 
-  async function handleClose() {
-    if (isDuplicate && bookmarkId) {
-      await deleteBookmarkById(bookmarkId);
-    }
+  function handleClose() {
+    // For duplicate: nothing was created yet, just close.
+    // For edit: discard changes, just close.
     currentBookmarkId.value = null;
     activeModal.value = null;
   }
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault();
-    if (!title.trim() || !url.trim() || !bookmarkId) return;
+    if (!title.trim() || !url.trim() || !bookmark) return;
 
-    await updateBookmark(bookmarkId, {
-      title: title.trim(),
-      url: url.trim(),
-      favicon: selectedFavicon,
-    });
+    const faviconOverride =
+      selectedFavicon !== null && selectedFavicon !== undefined;
+
+    if (isDuplicate) {
+      // Create the duplicate now with user-edited data
+      const overrides = { title: title.trim(), url: url.trim() };
+      if (faviconOverride) overrides.favicon = selectedFavicon;
+      duplicateBookmark(bookmarkId, overrides);
+    } else {
+      updateBookmark(bookmarkId, {
+        title: title.trim(),
+        url: url.trim(),
+        favicon: selectedFavicon,
+      });
+    }
 
     currentBookmarkId.value = null;
     activeModal.value = null;
