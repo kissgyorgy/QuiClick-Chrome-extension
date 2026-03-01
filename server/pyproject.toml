@@ -14,6 +14,9 @@ dependencies = [
     "uvicorn>=0.34.2",
 ]
 
+[tool.setuptools.packages.find]
+include = ["quiclick_server*"]
+
 [dependency-groups]
 dev = [
     "pdbpp>=0.11.7",

@@ -3,8 +3,6 @@
 // The background worker watches chrome.storage.onChanged for syncQueue
 // changes and processes them.
 
-const SYNC_API_BASE_URL = "https://local.fancyauth.com:8000";
-
 /**
  * Enqueue a sync operation. Coalesces update_settings and reorder ops.
  *

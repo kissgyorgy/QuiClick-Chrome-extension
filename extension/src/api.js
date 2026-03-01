@@ -1,7 +1,7 @@
 // QuiClick API Client
 // Handles all communication with the QuiClick server
 
-const API_BASE_URL = "https://local.fancyauth.com:8000";
+const API_BASE_URL = "https://quiclick.walkman.io";
 
 class QuiClickAPI {
   constructor() {
