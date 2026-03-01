@@ -266,8 +266,13 @@ export function SettingsModal() {
 }
 
 function ToggleSwitch({ checked, onChange }) {
+  function handleClick(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    onChange();
+  }
   return (
-    <div class="relative flex items-center" onClick={onChange}>
+    <div class="relative flex items-center" onClick={handleClick}>
       <input type="checkbox" checked={checked} class="sr-only" readOnly />
       <div class="toggle-bg w-10 h-6 rounded-full shadow-inner cursor-pointer" />
       <div
