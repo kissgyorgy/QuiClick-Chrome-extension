@@ -72,7 +72,7 @@ export function FolderTile({ folder }) {
       </div>
       {showTitles && (
         <div class="tile-title absolute bottom-1 left-1 right-1">
-          <span class="text-xs text-gray-800 text-center block truncate">
+          <span class="text-xs text-custom-text text-center block truncate">
             {folder.name}
           </span>
         </div>

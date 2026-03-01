@@ -88,17 +88,17 @@ export function ContextMenu() {
     <div
       ref={menuRef}
       id="contextMenu"
-      class="context-menu fixed rounded-lg py-2 z-60 min-w-[120px]"
+      class="context-menu fixed rounded-lg py-2 z-60 min-w-30 backdrop-blur-xl border border-white/90"
       style={{ left: `${x}px`, top: `${y}px` }}
     >
       {type === "bookmark" && (
         <>
           <button
-            class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 cursor-pointer font-bold"
+            class="group w-full px-3 py-2 text-left text-sm text-custom-text hover:bg-sky-400/15 hover:text-sky-900 flex items-center space-x-2 cursor-pointer font-bold transition-all duration-200"
             onClick={handleEdit}
           >
             <svg
-              class="w-4 h-4"
+              class="w-4 h-4 opacity-60 group-hover:opacity-100"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -113,11 +113,11 @@ export function ContextMenu() {
             <span>Edit</span>
           </button>
           <button
-            class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 cursor-pointer font-bold"
+            class="group w-full px-3 py-2 text-left text-sm text-custom-text hover:bg-sky-400/15 hover:text-sky-900 flex items-center space-x-2 cursor-pointer font-bold transition-all duration-200"
             onClick={handleDuplicate}
           >
             <svg
-              class="w-4 h-4"
+              class="w-4 h-4 opacity-60 group-hover:opacity-100"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -132,11 +132,11 @@ export function ContextMenu() {
             <span>Duplicate</span>
           </button>
           <button
-            class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 cursor-pointer font-bold"
+            class="group w-full px-3 py-2 text-left text-sm text-custom-text hover:bg-sky-400/15 hover:text-sky-900 flex items-center space-x-2 cursor-pointer font-bold transition-all duration-200"
             onClick={handleCopyUrl}
           >
             <svg
-              class="w-4 h-4"
+              class="w-4 h-4 opacity-60 group-hover:opacity-100"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -151,11 +151,11 @@ export function ContextMenu() {
             <span>Copy URL</span>
           </button>
           <button
-            class="btn-delete w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 cursor-pointer font-bold"
+            class="group w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-500/10 hover:text-red-700 flex items-center space-x-2 cursor-pointer font-bold transition-all duration-200"
             onClick={handleDelete}
           >
             <svg
-              class="w-4 h-4"
+              class="w-4 h-4 opacity-60 group-hover:opacity-100"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -175,11 +175,11 @@ export function ContextMenu() {
       {type === "folder" && (
         <>
           <button
-            class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 cursor-pointer font-bold"
+            class="group w-full px-3 py-2 text-left text-sm text-custom-text hover:bg-sky-400/15 hover:text-sky-900 flex items-center space-x-2 cursor-pointer font-bold transition-all duration-200"
             onClick={handleRenameFolder}
           >
             <svg
-              class="w-4 h-4"
+              class="w-4 h-4 opacity-60 group-hover:opacity-100"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -194,11 +194,11 @@ export function ContextMenu() {
             <span>Rename</span>
           </button>
           <button
-            class="btn-delete w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 cursor-pointer font-bold"
+            class="group w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-500/10 hover:text-red-700 flex items-center space-x-2 cursor-pointer font-bold transition-all duration-200"
             onClick={handleDeleteFolder}
           >
             <svg
-              class="w-4 h-4"
+              class="w-4 h-4 opacity-60 group-hover:opacity-100"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

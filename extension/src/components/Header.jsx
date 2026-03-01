@@ -2,7 +2,7 @@ import { activeModal } from "../state/store.js";
 
 export function Header() {
   return (
-    <header class="border-b border-custom-border px-6 py-4">
+    <header class="border-b border-white/80 backdrop-blur-lg px-6 py-4">
       <div class="max-w-7xl mx-auto flex items-center justify-between">
         <div class="flex items-center space-x-3">
           <div class="w-8 h-8 bg-custom-accent rounded-lg flex items-center justify-center">
@@ -14,7 +14,9 @@ export function Header() {
               <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
             </svg>
           </div>
-          <h1 class="text-2xl font-bold text-custom-text">QuiClick</h1>
+          <h1 class="text-2xl font-bold bg-gradient-to-br from-sky-900 via-sky-500 to-sky-400 bg-clip-text text-transparent">
+            QuiClick
+          </h1>
         </div>
 
         <div class="flex items-center space-x-4">

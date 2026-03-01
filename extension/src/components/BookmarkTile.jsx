@@ -83,7 +83,7 @@ export function BookmarkTile({ bookmark }) {
       </div>
       {showTitles && (
         <div class="tile-title absolute bottom-1 left-1 right-1">
-          <span class="text-xs text-gray-800 text-center block truncate">
+          <span class="text-xs text-custom-text text-center block truncate">
             {bookmark.title}
           </span>
         </div>

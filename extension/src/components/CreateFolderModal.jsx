@@ -25,12 +25,12 @@ function CreateFolderForm() {
 
   return (
     <div
-      class="modal-backdrop fixed inset-0 flex items-center justify-center z-50"
+      class="modal-backdrop fixed inset-0 flex items-center justify-center z-50 bg-sky-200/60 backdrop-blur-md"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div class="modal-content rounded-xl p-6 w-96 mx-4">
+      <div class="modal-content rounded-xl p-6 w-96 mx-4 backdrop-blur-xl border border-white/80">
         <h3 class="text-lg font-semibold text-custom-text mb-4">
           Create New Folder
         </h3>

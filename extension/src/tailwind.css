@@ -32,57 +32,13 @@ body {
   min-height: 100vh;
 }
 
-/* Additional grid column classes for tiles per row setting */
-.grid-cols-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.grid-cols-4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-.grid-cols-5 {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-.grid-cols-7 {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-.grid-cols-8 {
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-}
-.grid-cols-9 {
-  grid-template-columns: repeat(9, minmax(0, 1fr));
-}
-.grid-cols-10 {
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-}
-.grid-cols-11 {
-  grid-template-columns: repeat(11, minmax(0, 1fr));
-}
-.grid-cols-12 {
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-}
-.grid-cols-13 {
-  grid-template-columns: repeat(13, minmax(0, 1fr));
-}
-.grid-cols-14 {
-  grid-template-columns: repeat(14, minmax(0, 1fr));
-}
-.grid-cols-15 {
-  grid-template-columns: repeat(15, minmax(0, 1fr));
+/* Viewport-relative sizes (can't be expressed with standard Tailwind classes) */
+.h-half-screen {
+  height: 50vh;
 }
 
-.plus-icon {
-  font-size: 4rem;
-  line-height: 1;
-  text-align: center;
-  vertical-align: middle;
-  font-family: monospace;
-}
-
-/* Favicon error state styling */
-.favicon-error {
-  border-color: #ef4444 !important;
-  background-color: rgba(239, 68, 68, 0.1) !important;
-  opacity: 0.7;
+.max-h-settings {
+  max-height: 80vh;
 }
 
 /* Modal Animations */
@@ -126,26 +82,9 @@ body {
   }
 }
 
-/* Modal Background Effect */
+/* Modal Backdrop */
 .modal-backdrop {
-  background: rgba(186, 230, 253, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   animation: modalFadeIn 0.3s ease-out;
-}
-
-.modal-backdrop.closing {
-  animation: modalFadeOut 0.2s ease-out;
-}
-
-/* Modal without backdrop */
-.modal-no-backdrop {
-  background: transparent;
-  pointer-events: none;
-}
-
-.modal-no-backdrop > * {
-  pointer-events: auto;
 }
 
 /* Glass Modal Content */
@@ -155,18 +94,11 @@ body {
     rgba(255, 255, 255, 0.97) 0%,
     rgba(240, 249, 255, 0.98) 100%
   );
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.8);
   box-shadow:
     0 20px 50px rgba(100, 150, 200, 0.15),
     0 8px 20px rgba(100, 150, 200, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
   animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.modal-content.closing {
-  animation: modalSlideOut 0.2s ease-out;
 }
 
 /* Glass Context Menu */
@@ -176,57 +108,12 @@ body {
     rgba(255, 255, 255, 0.97) 0%,
     rgba(240, 249, 255, 0.98) 100%
   );
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.9);
   box-shadow:
     0 16px 40px rgba(100, 150, 200, 0.15),
     0 6px 16px rgba(100, 150, 200, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
   animation: modalSlideIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   transform-origin: top left;
-}
-
-.context-menu button {
-  color: #1e3a5f;
-  transition: all 0.2s ease;
-}
-
-.context-menu button.btn-delete {
-  color: #dc2626 !important;
-}
-
-.context-menu button.btn-delete:hover {
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c !important;
-}
-
-.context-menu button:hover {
-  background: rgba(56, 189, 248, 0.15);
-  color: #0c4a6e;
-}
-
-.context-menu button svg {
-  opacity: 0.6;
-}
-
-.context-menu button:hover svg {
-  opacity: 1;
-}
-
-.context-menu #deleteBookmark,
-.context-menu #deleteFolder {
-  color: #dc2626;
-}
-
-.context-menu #deleteBookmark:hover,
-.context-menu #deleteFolder:hover {
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
-}
-
-.context-menu.closing {
-  animation: modalSlideOut 0.15s ease-out;
 }
 
 /* Glass Delete Popup */
@@ -236,18 +123,11 @@ body {
     rgba(255, 255, 255, 0.97) 0%,
     rgba(254, 242, 242, 0.98) 100%
   );
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(254, 202, 202, 0.5);
   box-shadow:
     0 16px 40px rgba(100, 150, 200, 0.15),
     0 6px 16px rgba(100, 150, 200, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
   animation: modalSlideIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.delete-popup.closing {
-  animation: modalSlideOut 0.15s ease-out;
 }
 
 /* Glass Edit Modal */
@@ -257,9 +137,6 @@ body {
     rgba(255, 255, 255, 0.97) 0%,
     rgba(240, 249, 255, 0.98) 100%
   );
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.8);
   box-shadow:
     0 20px 50px rgba(100, 150, 200, 0.15),
     0 8px 20px rgba(100, 150, 200, 0.1),
@@ -267,74 +144,13 @@ body {
   animation: modalSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.edit-modal.closing {
-  animation: modalSlideOut 0.15s ease-out;
-}
-
-/* Bookmark Tile Highlighting */
-.tile-highlighted {
-  background: rgba(56, 189, 248, 0.15) !important;
-  border: 2px solid rgba(56, 189, 248, 0.5) !important;
-  box-shadow:
-    0 0 0 3px rgba(56, 189, 248, 0.15),
-    0 8px 24px rgba(56, 189, 248, 0.2) !important;
-  transform: scale(1.02);
-  transition: all 0.2s ease-out;
-}
-
-.tile-highlighted:hover {
-  background: rgba(56, 189, 248, 0.2) !important;
-  box-shadow:
-    0 0 0 3px rgba(56, 189, 248, 0.2),
-    0 12px 32px rgba(56, 189, 248, 0.25) !important;
-}
-
-/* Bookmark Tile Delete Highlighting */
-.tile-delete-highlighted {
-  background: rgba(239, 68, 68, 0.1) !important;
-  border: 2px solid rgba(239, 68, 68, 0.5) !important;
-  box-shadow:
-    0 0 0 3px rgba(239, 68, 68, 0.1),
-    0 8px 24px rgba(239, 68, 68, 0.15) !important;
-  transform: scale(1.02);
-  transition: all 0.2s ease-out;
-}
-
-.tile-delete-highlighted:hover {
-  background: rgba(239, 68, 68, 0.15) !important;
-  box-shadow:
-    0 0 0 3px rgba(239, 68, 68, 0.15),
-    0 12px 32px rgba(239, 68, 68, 0.2) !important;
-}
-
-/* Folder Tile Delete Highlighting */
-.folder-delete-highlighted {
-  background: rgba(239, 68, 68, 0.1) !important;
-  border: 2px solid rgba(239, 68, 68, 0.5) !important;
-  box-shadow:
-    0 0 0 3px rgba(239, 68, 68, 0.1),
-    0 8px 24px rgba(239, 68, 68, 0.15) !important;
-  transform: scale(1.02);
-  transition: all 0.2s ease-out;
-}
-
-.folder-delete-highlighted:hover {
-  background: rgba(239, 68, 68, 0.15) !important;
-  box-shadow:
-    0 0 0 3px rgba(239, 68, 68, 0.15),
-    0 12px 32px rgba(239, 68, 68, 0.2) !important;
-}
-
 /* Toggle Switch Styles */
 .toggle-bg {
   background: rgba(148, 197, 230, 0.3);
   border: 1px solid rgba(148, 197, 230, 0.4);
-  transition: all 0.3s ease;
 }
 
 .toggle-dot {
-  background: white;
-  border: none;
   box-shadow: 0 2px 6px rgba(100, 150, 200, 0.25);
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -498,40 +314,19 @@ input:checked ~ .toggle-dot {
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
-.tile-3d-add .plus-icon {
-  color: rgba(14, 165, 233, 0.5);
-  transition: all 0.35s ease;
-}
-
-.tile-3d-add:hover .plus-icon {
-  color: #0ea5e9;
-  transform: scale(1.08);
-}
-
 /* Glass Header */
 header {
   background: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.8) 0%,
     rgba(240, 249, 255, 0.75) 100%
-  ) !important;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.8) !important;
+  );
   box-shadow: 0 4px 20px rgba(100, 150, 200, 0.1);
-}
-
-header h1 {
-  background: linear-gradient(135deg, #0c4a6e 0%, #0ea5e9 60%, #38bdf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
 /* Glass Buttons */
 header button,
-.modal-content button[type="submit"],
-#confirmImportBtn {
+.modal-content button[type="submit"] {
   background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%) !important;
   border: 1px solid rgba(125, 211, 252, 0.5) !important;
   box-shadow:
@@ -542,8 +337,7 @@ header button,
 }
 
 header button:hover,
-.modal-content button[type="submit"]:hover,
-#confirmImportBtn:hover {
+.modal-content button[type="submit"]:hover {
   background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%) !important;
   box-shadow:
     0 8px 20px rgba(14, 165, 233, 0.3),
@@ -552,7 +346,6 @@ header button:hover,
   transform: translateY(-1px);
 }
 
-#createFolderBtn,
 header button.btn-create-folder {
   background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
   border: 1px solid rgba(253, 224, 71, 0.5) !important;
@@ -562,7 +355,6 @@ header button.btn-create-folder {
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
-#createFolderBtn:hover,
 header button.btn-create-folder:hover {
   background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%) !important;
   box-shadow:
@@ -571,27 +363,8 @@ header button.btn-create-folder:hover {
     inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
-#confirmDeleteBtn {
-  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%) !important;
-  border: 1px solid rgba(252, 165, 165, 0.5) !important;
-  box-shadow:
-    0 4px 14px rgba(239, 68, 68, 0.25),
-    0 2px 4px rgba(239, 68, 68, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-
-#confirmDeleteBtn:hover {
-  background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%) !important;
-  box-shadow:
-    0 8px 20px rgba(239, 68, 68, 0.3),
-    0 4px 8px rgba(239, 68, 68, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
-}
-
 /* Secondary/Cancel Buttons */
-.modal-content button[type="button"],
-#cancelDeleteBtn,
-#cancelImportBtn {
+.modal-content button[type="button"] {
   background: rgba(255, 255, 255, 0.6) !important;
   border: 1px solid rgba(148, 197, 230, 0.4) !important;
   color: #1e3a5f !important;
@@ -601,9 +374,7 @@ header button.btn-create-folder:hover {
   transition: all 0.3s ease;
 }
 
-.modal-content button[type="button"]:hover,
-#cancelDeleteBtn:hover,
-#cancelImportBtn:hover {
+.modal-content button[type="button"]:hover {
   background: rgba(255, 255, 255, 0.85) !important;
   border-color: rgba(148, 197, 230, 0.6) !important;
   color: #0c4a6e !important;
@@ -640,45 +411,6 @@ header button.btn-create-folder:hover {
   color: #1e3a5f !important;
 }
 
-/* Glass Settings Button */
-#settingsBtn {
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.8) 0%,
-    rgba(240, 249, 255, 0.75) 100%
-  ) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.9) !important;
-  box-shadow:
-    0 8px 24px rgba(100, 150, 200, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  transition: all 0.3s ease;
-}
-
-#settingsBtn:hover {
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.95) 0%,
-    rgba(224, 242, 254, 0.9) 100%
-  ) !important;
-  border-color: rgba(56, 189, 248, 0.4) !important;
-  box-shadow:
-    0 12px 32px rgba(100, 150, 200, 0.18),
-    0 0 0 1px rgba(56, 189, 248, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
-  transform: scale(1.05);
-}
-
-#settingsBtn svg {
-  color: #64748b;
-  transition: all 0.3s ease;
-}
-
-#settingsBtn:hover svg {
-  color: #0ea5e9;
-}
-
 /* Glass Range Slider */
 input[type="range"] {
   -webkit-appearance: none;
@@ -708,132 +440,8 @@ input[type="range"]::-webkit-slider-thumb:hover {
     0 0 0 2px rgba(14, 165, 233, 0.15);
 }
 
-/* Favicon Selection Grid */
-#faviconOptions,
-#editFaviconOptions {
-  background: rgba(255, 255, 255, 0.5) !important;
-  border: 1px solid rgba(148, 197, 230, 0.25) !important;
-}
-
-/* Sync Status */
-#settingsSyncStatus {
-  background: rgba(255, 255, 255, 0.5) !important;
-  border: 1px solid rgba(148, 197, 230, 0.25);
-}
-
-#settingsSyncText {
-  color: #475569 !important;
-}
-
-/* Export/Import Buttons */
-#exportBtn {
-  background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%) !important;
-  border: 1px solid rgba(134, 239, 172, 0.5) !important;
-  box-shadow:
-    0 4px 14px rgba(34, 197, 94, 0.25),
-    0 2px 4px rgba(34, 197, 94, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-
-#exportBtn:hover {
-  background: linear-gradient(135deg, #86efac 0%, #4ade80 100%) !important;
-  box-shadow:
-    0 8px 20px rgba(34, 197, 94, 0.3),
-    0 4px 8px rgba(34, 197, 94, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
-}
-
-#importBtn {
-  background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%) !important;
-  border: 1px solid rgba(125, 211, 252, 0.5) !important;
-  box-shadow:
-    0 4px 14px rgba(14, 165, 233, 0.25),
-    0 2px 4px rgba(14, 165, 233, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-
-#importBtn:hover {
-  background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%) !important;
-  box-shadow:
-    0 8px 20px rgba(14, 165, 233, 0.3),
-    0 4px 8px rgba(14, 165, 233, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
-}
-
-/* Delete Popup Text Colors */
-.delete-popup #deleteConfirmMessage {
-  color: #1e3a5f !important;
-}
-
-/* Import Confirm Modal Overrides */
-#importConfirmModal .modal-content p,
-#importConfirmModal .modal-content span,
-#importConfirmModal .modal-content li {
-  color: #1e3a5f !important;
-}
-
-#importConfirmModal .bg-amber-50 {
-  background: rgba(254, 243, 199, 0.7) !important;
-  border-color: rgba(251, 191, 36, 0.35) !important;
-}
-
-#importConfirmModal .text-amber-800 {
-  color: #92400e !important;
-}
-
-/* Notification Toast */
-#copyNotification > div,
-#importNotification > div {
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.9) 0%,
-    rgba(240, 249, 255, 0.85) 100%
-  ) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.9) !important;
-  color: #1e3a5f !important;
-  box-shadow: 0 8px 24px rgba(100, 150, 200, 0.15);
-}
-
-/* Folder Modal Specific */
-#folderModal .modal-content {
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.97) 0%,
-    rgba(240, 249, 255, 0.98) 100%
-  );
-}
-
-#folderModal .bg-gradient-to-r {
-  background: linear-gradient(
-    90deg,
-    rgba(254, 243, 199, 0.6) 0%,
-    rgba(255, 237, 213, 0.5) 100%
-  ) !important;
-  border-bottom: 1px solid rgba(251, 191, 36, 0.2) !important;
-}
-
-#folderModalTitle {
-  background: linear-gradient(135deg, #92400e 0%, #d97706 50%, #f59e0b 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-#closeFolderBtn {
-  color: #64748b;
-  transition: all 0.3s ease;
-}
-
-#closeFolderBtn:hover {
-  color: #1e3a5f;
-  background: rgba(148, 197, 230, 0.2) !important;
-}
-
-/* Tile Title Text */
+/* Tile Title Text Shadow */
 .tile-title span {
-  color: #1e3a5f !important;
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
 }
 

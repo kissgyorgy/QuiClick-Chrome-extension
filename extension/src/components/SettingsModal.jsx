@@ -87,7 +87,7 @@ export function SettingsModal() {
 
   return (
     <div class="fixed right-6 bottom-20 mr-8 -mb-4 z-50">
-      <div class="modal-content rounded-xl p-6 w-96 max-h-[80vh] overflow-y-auto">
+      <div class="modal-content rounded-xl p-6 w-96 max-h-settings overflow-y-auto backdrop-blur-xl border border-white/80">
         <h3 class="text-lg font-semibold text-custom-text mb-4">Settings</h3>
 
         {/* Show/Hide Bookmark Titles */}

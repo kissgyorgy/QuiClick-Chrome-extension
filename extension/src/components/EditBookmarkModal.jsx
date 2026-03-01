@@ -78,13 +78,16 @@ function EditBookmarkForm({ isDuplicate }) {
 
   return (
     <div
-      class="modal-backdrop fixed inset-0 flex items-center justify-center z-60"
+      class="modal-backdrop fixed inset-0 flex items-center justify-center z-60 bg-sky-200/60 backdrop-blur-md"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div ref={modalRef} class="edit-modal fixed z-60 w-96">
-        <div class="modal-content rounded-xl p-6">
+      <div
+        ref={modalRef}
+        class="edit-modal fixed z-60 w-96 backdrop-blur-xl border border-white/80 rounded-xl"
+      >
+        <div class="modal-content rounded-xl p-6 backdrop-blur-xl border border-white/80">
           <h3 class="text-lg font-semibold text-custom-text mb-4">
             {isDuplicate ? "Duplicate Bookmark" : "Edit Bookmark"}
           </h3>

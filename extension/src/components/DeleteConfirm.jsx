@@ -49,7 +49,10 @@ function BookmarkDeletePopup() {
   if (!bookmark) return null;
 
   return (
-    <div ref={popupRef} class="delete-popup fixed rounded-lg p-4 z-70 w-64">
+    <div
+      ref={popupRef}
+      class="delete-popup fixed rounded-lg p-4 z-70 w-64 backdrop-blur-xl border border-red-200/50"
+    >
       <div class="text-sm text-gray-700 mb-3">
         Are you sure you want to delete <strong>{bookmark.title}</strong>?
       </div>
@@ -110,7 +113,10 @@ function FolderDeletePopup() {
   const bookmarkText = bookmarkCount === 1 ? "bookmark" : "bookmarks";
 
   return (
-    <div ref={popupRef} class="delete-popup fixed rounded-lg p-4 z-70 w-64">
+    <div
+      ref={popupRef}
+      class="delete-popup fixed rounded-lg p-4 z-70 w-64 backdrop-blur-xl border border-red-200/50"
+    >
       <div class="text-sm text-gray-700 mb-3">
         Are you sure you want to delete folder <strong>{folder.name}</strong>?
         <br />

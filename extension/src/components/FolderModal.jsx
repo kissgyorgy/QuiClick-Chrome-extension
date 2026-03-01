@@ -56,7 +56,7 @@ function FolderModalContent({ folder, folderId }) {
 
   return (
     <div
-      class={`modal-backdrop fixed inset-0 flex items-start justify-center pt-16 pb-32 z-50 ${dropHover ? "bg-blue-100/20" : ""}`}
+      class={`modal-backdrop fixed inset-0 flex items-start justify-center pt-16 pb-32 z-50 bg-sky-200/60 backdrop-blur-md ${dropHover ? "bg-blue-100/20" : ""}`}
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
@@ -71,7 +71,7 @@ function FolderModalContent({ folder, folderId }) {
           </div>
         </div>
       )}
-      <div class="modal-content rounded-xl w-auto max-w-6xl min-w-[800px] mx-4 h-[50vh] overflow-hidden flex flex-col">
+      <div class="modal-content rounded-xl w-auto max-w-6xl min-w-200 mx-4 h-half-screen overflow-hidden flex flex-col backdrop-blur-xl border border-white/80">
         <div class="relative border-b border-gray-200 px-8 py-6 bg-gradient-to-r from-amber-50 to-yellow-50">
           <h3 class="text-2xl font-bold text-gray-800 text-center">
             {folder.name}
@@ -196,7 +196,7 @@ function FolderBookmarkTile({ bookmark, showTitles }) {
       </div>
       {showTitles && (
         <div class="tile-title absolute bottom-1 left-1 right-1">
-          <span class="text-xs text-gray-800 text-center block truncate">
+          <span class="text-xs text-custom-text text-center block truncate">
             {bookmark.title}
           </span>
         </div>
