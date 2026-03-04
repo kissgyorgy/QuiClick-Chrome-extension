@@ -44,8 +44,10 @@ export function NewTabApp() {
       }
     }
 
-    // Global click listener — hide context menu + settings on outside click
-    function handleClick(e) {
+    // Global mousedown listener — hide context menu + settings on outside click
+    // Uses mousedown instead of click so that starting a text selection inside
+    // a modal and dragging out doesn't accidentally close it.
+    function handleMouseDown(e) {
       const ctx = contextMenu.peek();
       if (ctx.visible) {
         const menu = document.getElementById("contextMenu");
@@ -165,13 +167,13 @@ export function NewTabApp() {
     document.body.addEventListener("drop", handleExternalDrop);
 
     document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("click", handleClick);
+    document.addEventListener("mousedown", handleMouseDown);
     document.addEventListener("contextmenu", handleContextMenu);
     document.addEventListener("paste", handlePaste);
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("click", handleClick);
+      document.removeEventListener("mousedown", handleMouseDown);
       document.removeEventListener("contextmenu", handleContextMenu);
       document.removeEventListener("paste", handlePaste);
       document.body.removeEventListener("drop", handleExternalDrop);

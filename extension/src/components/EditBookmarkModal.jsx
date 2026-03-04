@@ -92,7 +92,7 @@ function EditBookmarkForm({ isDuplicate }) {
   return (
     <div
       class="modal-backdrop fixed inset-0 flex items-center justify-center z-60 bg-sky-200/60 backdrop-blur-md"
-      onClick={(e) => {
+      onMouseDown={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >

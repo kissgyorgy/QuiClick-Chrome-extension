@@ -124,7 +124,7 @@ function FolderModalContent({ folder, folderId }) {
   return (
     <div
       class={`modal-backdrop fixed inset-0 flex items-start justify-center pt-16 pb-32 z-50 bg-sky-200/60 backdrop-blur-md ${dropHover ? "bg-blue-100/20" : ""}`}
-      onClick={(e) => {
+      onMouseDown={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
       onDragOver={handleBackdropDragOver}
