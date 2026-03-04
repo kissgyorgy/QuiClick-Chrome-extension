@@ -15,6 +15,7 @@ class QuiClickAPI {
     const url = `${API_BASE_URL}${path}`;
     const defaults = {
       credentials: "include",
+      cache: "no-store",
       headers: { "Content-Type": "application/json" },
     };
     const response = await fetch(url, { ...defaults, ...options });
@@ -111,8 +112,8 @@ class QuiClickAPI {
   }
 
   // --- Data model translation ---
-  // Server uses: {id, type, title, url, favicon, date_added, parent_id, position}
-  // Extension uses: {id, title, url, favicon, dateAdded, folderId}
+  // Server uses: {id, type, title, url, favicon, date_added, parent_id, position: [x, y]}
+  // Extension uses: {id, title, url, favicon, dateAdded, folderId, position: [x, y]}
 
   _serverBookmarkToExtension(serverBookmark) {
     return {
@@ -122,6 +123,7 @@ class QuiClickAPI {
       favicon: serverBookmark.favicon || "",
       dateAdded: serverBookmark.date_added,
       folderId: serverBookmark.parent_id,
+      position: serverBookmark.position, // [x, y] pass-through
     };
   }
 
@@ -130,6 +132,7 @@ class QuiClickAPI {
       id: serverFolder.id,
       name: serverFolder.title,
       dateCreated: serverFolder.date_added,
+      position: serverFolder.position, // [x, y] pass-through
     };
   }
 
@@ -283,6 +286,7 @@ class QuiClickAPI {
     const resp = await fetch(url, {
       credentials: "include",
       headers,
+      cache: "no-store",
     });
 
     if (resp.status === 304) {

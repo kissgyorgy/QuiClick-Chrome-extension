@@ -1,18 +1,57 @@
-import { bookmarks, folders } from "../state/store.js";
+import {
+  bookmarks,
+  folders,
+  settings,
+  addBookmarkPosition,
+  addBookmarkFolderId,
+} from "../state/store.js";
 import { persistBookmarks } from "../state/storage-bridge.js";
 import { enqueueSync } from "../sync-queue.js";
 import {
   getHighResolutionFavicon,
   cleanupUnusedFavicons,
-  downloadAndCacheFavicon,
 } from "../utils/favicon.js";
 import { normalizeUrl } from "../utils/url.js";
 
+/**
+ * Ensure a position value is [x, y]. Converts legacy integer positions
+ * (from the old float-based system) to [index, 0] style coordinates.
+ */
+function normalizePosition(pos, index, tilesPerRow = 8) {
+  if (Array.isArray(pos) && pos.length === 2) return pos;
+  // Legacy: position was a float/integer index
+  const i = typeof pos === "number" ? Math.round(pos) : index;
+  return [i % tilesPerRow, Math.floor(i / tilesPerRow)];
+}
+
 export async function loadBookmarks() {
   try {
-    const result = await chrome.storage.local.get(["bookmarks", "folders"]);
-    bookmarks.value = result.bookmarks || (await getDefaultBookmarks());
-    folders.value = result.folders || [];
+    const result = await chrome.storage.local.get([
+      "bookmarks",
+      "folders",
+      "bookmarkSettings",
+    ]);
+    const tilesPerRow = result.bookmarkSettings?.tilesPerRow ?? 8;
+
+    const rawBookmarks = result.bookmarks;
+    if (rawBookmarks) {
+      bookmarks.value = rawBookmarks.map((b, i) => ({
+        ...b,
+        position: normalizePosition(b.position, i, tilesPerRow),
+      }));
+    } else {
+      bookmarks.value = await getDefaultBookmarks();
+    }
+
+    const rawFolders = result.folders;
+    if (rawFolders) {
+      folders.value = rawFolders.map((f, i) => ({
+        ...f,
+        position: normalizePosition(f.position, i, tilesPerRow),
+      }));
+    } else {
+      folders.value = [];
+    }
   } catch (error) {
     console.log("Error loading from local storage:", error.message);
     bookmarks.value = await getDefaultBookmarks();
@@ -28,6 +67,7 @@ async function getDefaultBookmarks() {
     { title: "YouTube", url: "https://www.youtube.com" },
   ];
 
+  const tilesPerRow = settings.peek().tilesPerRow;
   const result = [];
   for (let i = 0; i < defaultUrls.length; i++) {
     const { title, url } = defaultUrls[i];
@@ -39,11 +79,39 @@ async function getDefaultBookmarks() {
       favicon,
       dateAdded: new Date().toISOString(),
       folderId: null,
+      position: [i % tilesPerRow, Math.floor(i / tilesPerRow)],
     });
   }
 
   return result;
 }
+
+// ─── getNextPosition helper ─────────────────────────────────────────────────
+
+/**
+ * Find the next available grid position after all existing items.
+ * Returns [x, y] — the cell immediately after the rightmost occupied cell
+ * in the bottom-most row, wrapping to the next row if needed.
+ */
+export function getNextPosition(items, tilesPerRow) {
+  if (!items || items.length === 0) return [0, 0];
+
+  let maxY = 0;
+  let maxX = -1;
+  for (const item of items) {
+    const [ix, iy] = item.position || [0, 0];
+    if (iy > maxY || (iy === maxY && ix > maxX)) {
+      maxY = iy;
+      maxX = ix;
+    }
+  }
+  if (maxX + 1 >= tilesPerRow) {
+    return [0, maxY + 1];
+  }
+  return [maxX + 1, maxY];
+}
+
+// ─── addBookmark ──────────────────────────────────────────────────────────
 
 export async function addBookmark({
   title,
@@ -52,6 +120,26 @@ export async function addBookmark({
 }) {
   const url = normalizeUrl(rawUrl);
   const faviconWasSelected = !!selectedFavicon;
+  const tilesPerRow = settings.peek().tilesPerRow;
+
+  // Use the clicked-cell position if set, otherwise find next available
+  const explicitPos = addBookmarkPosition.peek();
+  const folderId = addBookmarkFolderId.peek();
+
+  let contextItems;
+  if (folderId) {
+    // Adding inside a folder — scope to that folder's bookmarks
+    contextItems = bookmarks.peek().filter((b) => b.folderId === folderId);
+  } else {
+    // Adding at root level
+    contextItems = [
+      ...folders.peek(),
+      ...bookmarks.peek().filter((b) => !b.folderId),
+    ];
+  }
+  const position = explicitPos || getNextPosition(contextItems, tilesPerRow);
+  addBookmarkPosition.value = null;
+  addBookmarkFolderId.value = null;
 
   const now = new Date().toISOString();
   const bookmark = {
@@ -60,17 +148,12 @@ export async function addBookmark({
     url,
     favicon: selectedFavicon || "",
     dateAdded: now,
-    folderId: null,
+    folderId: folderId || null,
     lastUpdated: now,
-    position: 0,
+    position,
   };
 
-  const current = [...bookmarks.peek()];
-  current.unshift(bookmark);
-  current.forEach((b, i) => {
-    b.position = i;
-  });
-  bookmarks.value = current;
+  bookmarks.value = [...bookmarks.peek(), bookmark];
   await persistBookmarks();
 
   if (!faviconWasSelected) {
@@ -83,7 +166,7 @@ export async function addBookmark({
     url: bookmark.url,
     favicon: bookmark.favicon || null,
     folderId: bookmark.folderId,
-    position: 0,
+    position: bookmark.position,
   });
 
   return bookmark;
@@ -126,6 +209,10 @@ export function duplicateBookmark(bookmarkId, overrides = {}) {
   const original = current.find((b) => b.id === bookmarkId);
   if (!original) return null;
 
+  const tilesPerRow = settings.peek().tilesPerRow;
+  const rootItems = [...folders.peek(), ...current.filter((b) => !b.folderId)];
+  const position = getNextPosition(rootItems, tilesPerRow);
+
   const now = new Date().toISOString();
   const duplicated = {
     ...original,
@@ -133,12 +220,11 @@ export function duplicateBookmark(bookmarkId, overrides = {}) {
     id: Date.now(),
     dateAdded: now,
     lastUpdated: now,
+    position,
   };
 
-  const originalIndex = current.findIndex((b) => b.id === bookmarkId);
-  current.splice(originalIndex + 1, 0, duplicated);
-  bookmarks.value = current;
-  persistBookmarks(); // fire-and-forget — don't block the UI
+  bookmarks.value = [...current, duplicated];
+  persistBookmarks(); // fire-and-forget
 
   enqueueSync("create_bookmark", {
     localId: duplicated.id,
@@ -146,7 +232,7 @@ export function duplicateBookmark(bookmarkId, overrides = {}) {
     url: duplicated.url,
     favicon: duplicated.favicon || null,
     folderId: duplicated.folderId,
-    position: originalIndex + 1,
+    position: duplicated.position,
   });
 
   return duplicated;
@@ -157,39 +243,6 @@ export async function deleteBookmarkById(bookmarkId) {
   await persistBookmarks();
   await cleanupUnusedFavicons(bookmarks.peek());
   enqueueSync("delete_bookmark", { id: bookmarkId });
-}
-
-export async function reorderBookmarks(draggedId, targetId, insertAfter) {
-  const current = [...bookmarks.peek()];
-  const draggedIndex = current.findIndex((b) => b.id == draggedId);
-  const targetIndex = current.findIndex((b) => b.id == targetId);
-
-  if (draggedIndex === -1 || targetIndex === -1) return;
-
-  const draggedBookmark = current.splice(draggedIndex, 1)[0];
-
-  let newIndex = targetIndex;
-  if (draggedIndex < targetIndex) {
-    newIndex = insertAfter ? targetIndex : targetIndex - 1;
-  } else {
-    newIndex = insertAfter ? targetIndex + 1 : targetIndex;
-  }
-
-  current.splice(newIndex, 0, draggedBookmark);
-
-  const now = new Date().toISOString();
-  current.forEach((b, i) => {
-    b.position = i;
-    b.lastUpdated = now;
-  });
-
-  bookmarks.value = current;
-  await persistBookmarks();
-
-  const reorderItems = current
-    .filter((b) => !b.folderId)
-    .map((b, i) => ({ id: b.id, position: i }));
-  enqueueSync("reorder", { items: reorderItems });
 }
 
 async function updateFaviconAsync(bookmarkId, url) {

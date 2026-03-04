@@ -80,7 +80,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // ─── Delta Pull ────────────────────────────────────────────────────────────
 
-async function pullChanges({ force = false } = {}) {
+async function pullChanges({ force = false, replace = false } = {}) {
   const storage = await chrome.storage.local.get([
     "lastPullDate",
     "authState",
@@ -95,7 +95,13 @@ async function pullChanges({ force = false } = {}) {
     return;
   }
 
-  const ifModifiedSince = storage.lastPullDate || null;
+  // If local data is empty but lastPullDate exists, force a full pull
+  // (e.g., after extension reload/update that lost local data)
+  const localEmpty =
+    (!storage.bookmarks || storage.bookmarks.length === 0) &&
+    (!storage.folders || storage.folders.length === 0);
+  const ifModifiedSince =
+    replace || localEmpty ? null : storage.lastPullDate || null;
 
   let result;
   try {
@@ -118,7 +124,6 @@ async function pullChanges({ force = false } = {}) {
   }
 
   if (result.status === 304) {
-    // Still authenticated, no data changes
     const existing = storage.authState || {};
     await chrome.storage.local.set({
       authState: {
@@ -143,68 +148,89 @@ async function pullChanges({ force = false } = {}) {
   });
 
   // Apply changes to local storage
-  let localBookmarks = storage.bookmarks || [];
-  let localFolders = storage.folders || [];
+  let localBookmarks;
+  let localFolders;
   let localSettings = storage.bookmarkSettings || null;
 
-  // Apply bookmark changes
-  for (const serverBm of data.bookmarks) {
-    const localIdx = localBookmarks.findIndex((b) => b.id === serverBm.id);
-    const serverTs = serverBm.last_updated || serverBm.date_added;
-
-    if (localIdx === -1) {
-      // New item from server
-      localBookmarks.push(serverBookmarkToLocal(serverBm));
-    } else {
-      const localTs = localBookmarks[localIdx].lastUpdated;
-      if (!localTs || serverTs > localTs) {
-        // Server is newer — overwrite
-        localBookmarks[localIdx] = serverBookmarkToLocal(serverBm);
-      }
-      // else: local is newer, keep local
-    }
-  }
-
-  // Apply folder changes
-  for (const serverFolder of data.folders) {
-    const localIdx = localFolders.findIndex((f) => f.id === serverFolder.id);
-    const serverTs = serverFolder.last_updated || serverFolder.date_added;
-
-    if (localIdx === -1) {
-      localFolders.push(serverFolderToLocal(serverFolder));
-    } else {
-      const localTs = localFolders[localIdx].lastUpdated;
-      if (!localTs || serverTs > localTs) {
-        localFolders[localIdx] = serverFolderToLocal(serverFolder);
-      }
-    }
-  }
-
-  // Apply settings changes
-  if (data.settings) {
-    const serverSettingsTs = data.settings.last_updated;
-    const localSettingsTs = localSettings?.lastUpdated;
-    if (!localSettingsTs || serverSettingsTs > localSettingsTs) {
+  if (replace) {
+    // Full replace — server is authoritative
+    localBookmarks = data.bookmarks.map(serverBookmarkToLocal);
+    localFolders = data.folders.map(serverFolderToLocal);
+    if (data.settings) {
       localSettings = {
         showTitles: data.settings.show_titles,
         tilesPerRow: data.settings.tiles_per_row,
         tileGap: data.settings.tile_gap,
         showAddButton: data.settings.show_add_button,
-        lastUpdated: serverSettingsTs,
+        lastUpdated: data.settings.last_updated,
       };
+    }
+  } else {
+    // Delta merge — keep local items, apply server changes on top
+    localBookmarks = storage.bookmarks || [];
+    localFolders = storage.folders || [];
+
+    for (const serverBm of data.bookmarks) {
+      const localIdx = localBookmarks.findIndex((b) => b.id === serverBm.id);
+      const serverTs = serverBm.last_updated || serverBm.date_added;
+
+      if (localIdx === -1) {
+        localBookmarks.push(serverBookmarkToLocal(serverBm));
+      } else {
+        const localTs = localBookmarks[localIdx].lastUpdated;
+        if (!localTs || serverTs > localTs) {
+          localBookmarks[localIdx] = serverBookmarkToLocal(serverBm);
+        }
+      }
+    }
+
+    for (const serverFolder of data.folders) {
+      const localIdx = localFolders.findIndex((f) => f.id === serverFolder.id);
+      const serverTs = serverFolder.last_updated || serverFolder.date_added;
+
+      if (localIdx === -1) {
+        localFolders.push(serverFolderToLocal(serverFolder));
+      } else {
+        const localTs = localFolders[localIdx].lastUpdated;
+        if (!localTs || serverTs > localTs) {
+          localFolders[localIdx] = serverFolderToLocal(serverFolder);
+        }
+      }
+    }
+
+    if (data.settings) {
+      const serverSettingsTs = data.settings.last_updated;
+      const localSettingsTs = localSettings?.lastUpdated;
+      if (!localSettingsTs || serverSettingsTs > localSettingsTs) {
+        localSettings = {
+          showTitles: data.settings.show_titles,
+          tilesPerRow: data.settings.tiles_per_row,
+          tileGap: data.settings.tile_gap,
+          showAddButton: data.settings.show_add_button,
+          lastUpdated: serverSettingsTs,
+        };
+      }
+    }
+
+    // Remove deleted items
+    if (data.deleted_ids && data.deleted_ids.length > 0) {
+      const deletedSet = new Set(data.deleted_ids);
+      localBookmarks = localBookmarks.filter((b) => !deletedSet.has(b.id));
+      localFolders = localFolders.filter((f) => !deletedSet.has(f.id));
     }
   }
 
-  // Remove deleted items
-  if (data.deleted_ids && data.deleted_ids.length > 0) {
-    const deletedSet = new Set(data.deleted_ids);
-    localBookmarks = localBookmarks.filter((b) => !deletedSet.has(b.id));
-    localFolders = localFolders.filter((f) => !deletedSet.has(f.id));
-  }
-
-  // Sort by position
-  localBookmarks.sort((a, b) => (a.position || 0) - (b.position || 0));
-  localFolders.sort((a, b) => (a.position || 0) - (b.position || 0));
+  // Sort by position [y, x]
+  localBookmarks.sort(
+    (a, b) =>
+      (a.position || [0, 0])[1] - (b.position || [0, 0])[1] ||
+      (a.position || [0, 0])[0] - (b.position || [0, 0])[0],
+  );
+  localFolders.sort(
+    (a, b) =>
+      (a.position || [0, 0])[1] - (b.position || [0, 0])[1] ||
+      (a.position || [0, 0])[0] - (b.position || [0, 0])[0],
+  );
 
   // Write back
   const updates = {
@@ -218,11 +244,6 @@ async function pullChanges({ force = false } = {}) {
     updates.lastPullDate = result.lastModified;
   }
   await chrome.storage.local.set(updates);
-
-  console.log(
-    `QuiClick: pull complete — ${data.bookmarks.length} bookmarks, ` +
-      `${data.folders.length} folders, ${(data.deleted_ids || []).length} deleted`,
-  );
 }
 
 // ─── Queue Processing ──────────────────────────────────────────────────────
@@ -302,20 +323,47 @@ async function processQueueItem(item) {
 }
 
 async function processCreateBookmark(item) {
-  const { localId, title, url, favicon, folderId, position } = item.payload;
-  const serverBm = await api.createBookmark({
-    title,
-    url,
-    favicon,
-    folderId,
-    position,
-  });
+  const { localId, title, url, favicon, folderId } = item.payload;
+  const position = normalizePayloadPosition(item.payload.position);
 
-  // Update local ID with server-assigned ID
-  if (localId && serverBm.id !== localId) {
-    await updateLocalId("bookmarks", localId, serverBm.id);
-    await rewriteQueueReferences(localId, serverBm.id);
-    await updateIdMap(localId, serverBm.id);
+  let serverBm;
+  try {
+    serverBm = await api.createBookmark({
+      title,
+      url,
+      favicon,
+      folderId,
+      position,
+    });
+  } catch (e) {
+    if (isPositionConflict(e)) {
+      // Let the server auto-assign a free position
+      serverBm = await api.createBookmark({
+        title,
+        url,
+        favicon,
+        folderId,
+        position: null,
+      });
+    } else {
+      throw e;
+    }
+  }
+
+  // Update local item with server-assigned ID and position
+  if (localId) {
+    if (serverBm.id !== localId) {
+      await updateLocalId("bookmarks", localId, serverBm.id);
+      await rewriteQueueReferences(localId, serverBm.id);
+      await updateIdMap(localId, serverBm.id);
+    }
+    if (serverBm.position) {
+      await updateLocalItemPosition(
+        "bookmarks",
+        serverBm.id,
+        serverBm.position,
+      );
+    }
   }
 }
 
@@ -337,15 +385,34 @@ async function processDeleteBookmark(item) {
 }
 
 async function processCreateFolder(item) {
-  const { localId, name, position } = item.payload;
-  const serverFolder = await api.createFolder({ name, position });
+  const { localId, name } = item.payload;
+  const position = normalizePayloadPosition(item.payload.position);
 
-  if (localId && serverFolder.id !== localId) {
-    await updateLocalId("folders", localId, serverFolder.id);
-    // Also update bookmarks that reference this folder
-    await updateFolderReferences(localId, serverFolder.id);
-    await rewriteQueueReferences(localId, serverFolder.id);
-    await updateIdMap(localId, serverFolder.id);
+  let serverFolder;
+  try {
+    serverFolder = await api.createFolder({ name, position });
+  } catch (e) {
+    if (isPositionConflict(e)) {
+      serverFolder = await api.createFolder({ name, position: null });
+    } else {
+      throw e;
+    }
+  }
+
+  if (localId) {
+    if (serverFolder.id !== localId) {
+      await updateLocalId("folders", localId, serverFolder.id);
+      await updateFolderReferences(localId, serverFolder.id);
+      await rewriteQueueReferences(localId, serverFolder.id);
+      await updateIdMap(localId, serverFolder.id);
+    }
+    if (serverFolder.position) {
+      await updateLocalItemPosition(
+        "folders",
+        serverFolder.id,
+        serverFolder.position,
+      );
+    }
   }
 }
 
@@ -371,7 +438,17 @@ async function processReorder(item) {
     const resolvedId = await resolveId(entry.id);
     resolvedItems.push({ id: resolvedId, position: entry.position });
   }
-  await api.reorderItems(resolvedItems);
+  try {
+    await api.reorderItems(resolvedItems);
+  } catch (e) {
+    if (isPositionConflict(e)) {
+      // Server is authoritative — pull latest state and drop this reorder
+      console.log("QuiClick: reorder conflict, pulling server state");
+      await pullChanges({ force: true });
+      return;
+    }
+    throw e;
+  }
 }
 
 async function processUpdateSettings(item) {
@@ -514,6 +591,34 @@ async function resetBackoff() {
   await chrome.alarms.clear(RETRY_ALARM_NAME);
 }
 
+// ─── Conflict resolution helpers ───────────────────────────────────────────
+
+function normalizePayloadPosition(pos) {
+  if (Array.isArray(pos) && pos.length === 2) return pos;
+  // Legacy integer position or missing — let the server auto-assign
+  return null;
+}
+
+function isPositionConflict(e) {
+  const msg = e.message || "";
+  // 409 = position conflict, 422 = legacy position format rejected
+  return (
+    msg.includes("409") || (msg.includes("422") && msg.includes("position"))
+  );
+}
+
+async function updateLocalItemPosition(storageKey, localId, newPosition) {
+  const data = await chrome.storage.local.get(storageKey);
+  const items = data[storageKey] || [];
+  const idx = items.findIndex(
+    (item) => item.id === localId || item.id === String(localId),
+  );
+  if (idx !== -1) {
+    items[idx] = { ...items[idx], position: newPosition };
+    await chrome.storage.local.set({ [storageKey]: items });
+  }
+}
+
 function isRetryableError(e) {
   const msg = e.message || "";
   // Network errors and 5xx are retryable
@@ -542,7 +647,8 @@ async function handleLoginCheck() {
       if (authState?.authenticated) {
         clearInterval(interval);
         await chrome.storage.local.set({ authAction: null });
-        // Process any pending queue items
+        // Replace local data with server data unconditionally
+        await pullChanges({ force: true, replace: true });
         processQueue();
       } else if (attempts >= maxAttempts) {
         clearInterval(interval);
@@ -602,7 +708,7 @@ function buildExportData(storageData) {
     favicon: b.favicon || null,
     date_added: b.dateAdded || new Date().toISOString(),
     parent_id: b.folderId || null,
-    position: b.position || 0,
+    position: b.position || [0, 0],
   }));
 
   const folders = (storageData.folders || []).map((f) => ({
@@ -610,7 +716,7 @@ function buildExportData(storageData) {
     title: f.name,
     date_added: f.dateCreated || new Date().toISOString(),
     parent_id: null,
-    position: f.position || 0,
+    position: f.position || [0, 0],
   }));
 
   const settings = storageData.bookmarkSettings

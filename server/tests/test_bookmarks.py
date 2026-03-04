@@ -46,7 +46,7 @@ def test_create_bookmark():
     assert data["type"] == "bookmark"
     assert data["favicon"] is None
     assert data["parent_id"] is None
-    assert data["position"] == 1.0
+    assert data["position"] == [0, 0]
     assert "id" in data
     assert "date_added" in data
     _cleanup()
@@ -60,8 +60,8 @@ def test_create_bookmark_auto_position():
     resp2 = client.post(
         "/bookmarks", json={"title": "Second", "url": "https://second.com"}
     )
-    assert resp1.json()["position"] == 1.0
-    assert resp2.json()["position"] == 2.0
+    assert resp1.json()["position"] == [0, 0]
+    assert resp2.json()["position"] == [1, 0]
     _cleanup()
 
 
@@ -69,9 +69,9 @@ def test_create_bookmark_explicit_position():
     client = _authenticated_client()
     resp = client.post(
         "/bookmarks",
-        json={"title": "At 5", "url": "https://five.com", "position": 5.0},
+        json={"title": "At 5,0", "url": "https://five.com", "position": [5, 0]},
     )
-    assert resp.json()["position"] == 5.0
+    assert resp.json()["position"] == [5, 0]
     _cleanup()
 
 
@@ -234,4 +234,27 @@ def test_bookmark_with_favicon():
     bid = resp.json()["id"]
     resp = client.get(f"/bookmarks/{bid}")
     assert resp.json()["favicon"] == data_url
+    _cleanup()
+
+
+# --- Position conflict (make_room) ---
+
+
+def test_create_bookmark_at_occupied_position_returns_409():
+    """Creating a bookmark at an occupied cell should return 409."""
+    client = _authenticated_client()
+
+    r1 = client.post(
+        "/bookmarks",
+        json={"title": "A", "url": "https://a.com", "position": [0, 0]},
+    )
+    assert r1.status_code == 201
+
+    # Creating another at the same position should conflict
+    r2 = client.post(
+        "/bookmarks",
+        json={"title": "B", "url": "https://b.com", "position": [0, 0]},
+    )
+    assert r2.status_code == 409
+    assert r2.json()["detail"] == "Position conflict"
     _cleanup()

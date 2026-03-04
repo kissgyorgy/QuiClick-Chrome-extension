@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useState, useRef, useEffect } from "preact/hooks";
 import {
   activeModal,
   bookmarks,
@@ -9,9 +9,14 @@ import {
   contextMenu,
   dragState,
 } from "../state/store.js";
-import { getGridClasses } from "../hooks/use-settings.js";
-import { useFolderModalDropHandlers } from "../hooks/use-drag-and-drop.js";
-import { useBookmarkDragHandlers } from "../hooks/use-drag-and-drop.js";
+import {
+  useFolderModalDropHandlers,
+  useInFolderDragHandlers,
+} from "../hooks/use-drag-and-drop.js";
+import { gapPxFromSetting } from "../hooks/use-settings.js";
+import { EmptyCell } from "./EmptyCell.jsx";
+
+const TILE_SIZE = 96;
 
 export function FolderModal() {
   const modal = activeModal.value;
@@ -27,11 +32,42 @@ export function FolderModal() {
 function FolderModalContent({ folder, folderId }) {
   const [dropHover, setDropHover] = useState(false);
   const folderModalDrop = useFolderModalDropHandlers(folderId);
-  const { showTitles, tilesPerRow, tileGap } = settings.value;
+  const { showTitles, tilesPerRow, tileGap, showAddButton } = settings.value;
   const folderBookmarks = bookmarks.value.filter(
     (b) => b.folderId === folderId,
   );
-  const gridClass = getGridClasses(tilesPerRow, tileGap);
+
+  const scrollRef = useRef(null);
+  const [visibleRows, setVisibleRows] = useState(4);
+
+  // Build cell map for folder bookmarks
+  const cellMap = new Map();
+  for (const bm of folderBookmarks) {
+    const [x, y] = bm.position || [0, 0];
+    cellMap.set(`${x},${y}`, bm);
+  }
+  let maxRow = 0;
+  for (const bm of folderBookmarks) {
+    const y = (bm.position || [0, 0])[1];
+    if (y > maxRow) maxRow = y;
+  }
+  const cols = tilesPerRow;
+  const gapPx = gapPxFromSetting(tileGap);
+
+  // Compute how many rows fill the scrollable area
+  useEffect(() => {
+    function update() {
+      if (!scrollRef.current) return;
+      const available = scrollRef.current.clientHeight - 32; // minus padding
+      const rows = Math.max(2, Math.floor(available / (TILE_SIZE + gapPx.y)));
+      setVisibleRows(rows);
+    }
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [tileGap]);
+
+  const totalRows = Math.max(maxRow + 2, visibleRows);
 
   function handleClose() {
     openFolderId.value = null;
@@ -52,6 +88,37 @@ function FolderModalContent({ folder, folderId }) {
   function handleBackdropDrop(e) {
     setDropHover(false);
     folderModalDrop.onDrop(e);
+  }
+
+  // Build cells with the same grid system as BookmarkGrid
+  const cells = [];
+  for (let y = 0; y < totalRows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const key = `${x},${y}`;
+      const bm = cellMap.get(key);
+      if (bm) {
+        cells.push(
+          <FolderBookmarkTile
+            key={bm.id}
+            bookmark={bm}
+            showTitles={showTitles}
+            gridX={x}
+            gridY={y}
+            folderId={folderId}
+          />,
+        );
+      } else {
+        cells.push(
+          <EmptyCell
+            key={key}
+            x={x}
+            y={y}
+            showAddButton={showAddButton}
+            folderId={folderId}
+          />,
+        );
+      }
+    }
   }
 
   return (
@@ -95,42 +162,38 @@ function FolderModalContent({ folder, folderId }) {
             </svg>
           </button>
         </div>
-        <div class="p-8 overflow-y-auto flex-1">
-          {folderBookmarks.length === 0 ? (
-            <div class="text-center text-gray-500 w-full py-8">
-              <svg
-                class="w-16 h-16 mx-auto mb-4 text-gray-300"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-              </svg>
-              <p class="text-lg font-medium">This folder is empty</p>
-              <p class="text-sm">Drag bookmarks here to organize them</p>
-            </div>
-          ) : (
-            <div id="folderBookmarks" class={gridClass}>
-              {folderBookmarks.map((bookmark) => (
-                <FolderBookmarkTile
-                  key={bookmark.id}
-                  bookmark={bookmark}
-                  showTitles={showTitles}
-                />
-              ))}
-            </div>
-          )}
+        <div ref={scrollRef} class="p-8 overflow-y-auto flex-1">
+          <div
+            id="folderBookmarks"
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${cols}, ${TILE_SIZE}px)`,
+              columnGap: `${gapPx.x}px`,
+              rowGap: `${gapPx.y}px`,
+              justifyContent: "center",
+            }}
+          >
+            {cells}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function FolderBookmarkTile({ bookmark, showTitles }) {
-  const drag = useBookmarkDragHandlers(bookmark.id);
+function FolderBookmarkTile({ bookmark, showTitles, gridX, gridY, folderId }) {
+  const drag = useInFolderDragHandlers(bookmark.id, gridX, gridY, folderId);
   const [faviconError, setFaviconError] = useState(false);
   const isDraggingThis =
     dragState.value.draggedBookmarkId === bookmark.id &&
     dragState.value.isDragging;
+
+  const dropTarget = dragState.value.dropTarget;
+  const isInsertTarget =
+    dropTarget?.type === "insert" &&
+    dropTarget.x === gridX &&
+    dropTarget.y === gridY;
+  const insertSide = isInsertTarget ? dropTarget.side : null;
 
   const paddingClass = showTitles ? "pt-2 px-4 pb-6" : "p-4";
 
@@ -160,7 +223,8 @@ function FolderBookmarkTile({ bookmark, showTitles }) {
 
   return (
     <div
-      class={`tile w-24 h-24 relative bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-200 hover:shadow-md transition-all duration-200 cursor-pointer ${isDraggingThis ? "opacity-50" : ""}`}
+      class={`tile tile-3d tile-3d-bookmark w-24 h-24 relative rounded-lg cursor-pointer ${isDraggingThis ? "opacity-50" : ""}`}
+      style={{ gridColumn: gridX + 1, gridRow: gridY + 1 }}
       data-bookmark-id={bookmark.id}
       draggable={true}
       title={bookmark.title}
@@ -169,6 +233,9 @@ function FolderBookmarkTile({ bookmark, showTitles }) {
       onContextMenu={handleContextMenu}
       onDragStart={drag.onDragStart}
       onDragEnd={drag.onDragEnd}
+      onDragOver={drag.onDragOver}
+      onDragLeave={drag.onDragLeave}
+      onDrop={drag.onDrop}
     >
       <a
         draggable={false}
@@ -200,6 +267,12 @@ function FolderBookmarkTile({ bookmark, showTitles }) {
             {bookmark.title}
           </span>
         </div>
+      )}
+      {insertSide === "left" && (
+        <div class="absolute top-0 left-0 bottom-0 w-0.5 bg-sky-500 rounded-full z-10" />
+      )}
+      {insertSide === "right" && (
+        <div class="absolute top-0 right-0 bottom-0 w-0.5 bg-sky-500 rounded-full z-10" />
       )}
     </div>
   );

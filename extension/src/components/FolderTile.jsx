@@ -7,14 +7,31 @@ import {
   contextMenu,
   dragState,
 } from "../state/store.js";
-import { useFolderDropHandlers } from "../hooks/use-drag-and-drop.js";
+import { useFolderDragHandlers } from "../hooks/use-drag-and-drop.js";
 
-export function FolderTile({ folder }) {
+export function FolderTile({ folder, gridX, gridY }) {
   const { showTitles } = settings.value;
   const [dropHover, setDropHover] = useState(false);
-  const folderDrop = useFolderDropHandlers(folder.id);
+  const drag = useFolderDragHandlers(folder.id, gridX, gridY);
+
+  const isDraggingThis =
+    dragState.value.draggedFolderId === folder.id && dragState.value.isDragging;
+
+  const dropTarget = dragState.value.dropTarget;
+  const x = gridX ?? (folder.position || [0, 0])[0];
+  const y = gridY ?? (folder.position || [0, 0])[1];
+  const isInsertTarget =
+    dropTarget?.type === "insert" && dropTarget.x === x && dropTarget.y === y;
+  const insertSide = isInsertTarget ? dropTarget.side : null;
+
+  // Show the amber "move into folder" highlight only for bookmark drags
+  const isBookmarkHovering =
+    dragState.value.isDragging &&
+    !!dragState.value.draggedBookmarkId &&
+    dropHover;
 
   function handleClick(e) {
+    if (dragState.peek().isDragging) return;
     e.preventDefault();
     openFolderId.value = folder.id;
     activeModal.value = "folder";
@@ -32,31 +49,35 @@ export function FolderTile({ folder }) {
   }
 
   function handleDragOver(e) {
+    drag.onDragOver(e);
     if (dragState.peek().draggedBookmarkId) {
-      folderDrop.onDragOver(e);
       setDropHover(true);
     }
   }
 
-  function handleDragLeave() {
+  function handleDragLeave(e) {
     setDropHover(false);
+    drag.onDragLeave(e);
   }
 
   function handleDrop(e) {
     setDropHover(false);
-    folderDrop.onDrop(e);
+    drag.onDrop(e);
   }
 
   const paddingClass = showTitles ? "pt-2 px-4 pb-6" : "p-4";
 
   return (
     <div
-      class={`tile tile-3d tile-3d-folder w-24 h-24 relative rounded-lg cursor-pointer ${dropHover ? "bg-amber-200 border-amber-400" : ""}`}
+      class={`tile tile-3d tile-3d-folder w-24 h-24 relative rounded-lg cursor-pointer ${isDraggingThis ? "opacity-50" : ""} ${isBookmarkHovering ? "bg-amber-200 border-amber-400" : ""}`}
+      style={{ gridColumn: x + 1, gridRow: y + 1 }}
       data-folder-id={folder.id}
-      draggable={false}
+      draggable={true}
       title={folder.name}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
+      onDragStart={drag.onDragStart}
+      onDragEnd={drag.onDragEnd}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -76,6 +97,12 @@ export function FolderTile({ folder }) {
             {folder.name}
           </span>
         </div>
+      )}
+      {insertSide === "left" && (
+        <div class="absolute top-0 left-0 bottom-0 w-0.5 bg-sky-500 rounded-full z-10" />
+      )}
+      {insertSide === "right" && (
+        <div class="absolute top-0 right-0 bottom-0 w-0.5 bg-sky-500 rounded-full z-10" />
       )}
     </div>
   );

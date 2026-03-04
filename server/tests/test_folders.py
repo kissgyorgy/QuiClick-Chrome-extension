@@ -33,7 +33,7 @@ def test_create_folder():
     assert data["title"] == "Work"
     assert data["type"] == "folder"
     assert data["parent_id"] is None
-    assert data["position"] == 1.0
+    assert data["position"] == [0, 0]
     _cleanup()
 
 
@@ -41,12 +41,12 @@ def test_create_folder_auto_position_shared_with_bookmarks():
     """Folders and bookmarks share the root position space."""
     client = _authenticated_client()
 
-    # Create a bookmark at position 1.0
+    # Create a bookmark at [0, 0]
     client.post("/bookmarks", json={"title": "BM", "url": "https://bm.com"})
 
-    # Create a folder — should get position 2.0
+    # Create a folder — should get position [1, 0]
     resp = client.post("/folders", json={"title": "Folder"})
-    assert resp.json()["position"] == 2.0
+    assert resp.json()["position"] == [1, 0]
     _cleanup()
 
 

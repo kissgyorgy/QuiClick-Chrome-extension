@@ -1,15 +1,24 @@
-import { bookmarks, folders } from "../state/store.js";
+import { bookmarks, folders, settings } from "../state/store.js";
 import { persistBookmarks } from "../state/storage-bridge.js";
 import { enqueueSync } from "../sync-queue.js";
+import { getNextPosition } from "./use-bookmarks.js";
 
 export async function createFolder(name) {
   const now = new Date().toISOString();
+  const tilesPerRow = settings.peek().tilesPerRow;
+
+  const rootItems = [
+    ...folders.peek(),
+    ...bookmarks.peek().filter((b) => !b.folderId),
+  ];
+  const position = getNextPosition(rootItems, tilesPerRow);
+
   const folder = {
     id: Date.now(),
     name,
     dateCreated: now,
     lastUpdated: now,
-    position: folders.peek().length,
+    position,
   };
 
   folders.value = [...folders.peek(), folder];
@@ -41,12 +50,27 @@ export async function renameFolder(folderId, newName) {
 }
 
 export async function deleteFolder(folderId) {
-  // Move all bookmarks in this folder back to main view
-  const updatedBookmarks = bookmarks
-    .peek()
-    .map((b) => (b.folderId === folderId ? { ...b, folderId: null } : b));
+  // Move all bookmarks in this folder back to main view at next available positions
+  const tilesPerRow = settings.peek().tilesPerRow;
+  const currentBookmarks = [...bookmarks.peek()];
+  const currentFolders = folders.peek().filter((f) => f.id !== folderId);
+
+  const rootItems = [
+    ...currentFolders,
+    ...currentBookmarks.filter((b) => !b.folderId),
+  ];
+
+  const updatedBookmarks = currentBookmarks.map((b) => {
+    if (b.folderId !== folderId) return b;
+    const position = getNextPosition(rootItems, tilesPerRow);
+    // Add this bookmark to rootItems so next one gets a different position
+    const updated = { ...b, folderId: null, position };
+    rootItems.push(updated);
+    return updated;
+  });
+
   bookmarks.value = updatedBookmarks;
-  folders.value = folders.peek().filter((f) => f.id !== folderId);
+  folders.value = currentFolders;
   await persistBookmarks();
 
   enqueueSync("delete_folder", { id: folderId });
@@ -57,25 +81,16 @@ export async function moveBookmarkToFolder(bookmarkId, folderId) {
   const index = current.findIndex((b) => b.id === bookmarkId);
   if (index === -1) return;
 
+  const tilesPerRow = settings.peek().tilesPerRow;
+  const folderBookmarks = current.filter(
+    (b) => b.folderId === folderId && b.id !== bookmarkId,
+  );
+  const position = getNextPosition(folderBookmarks, tilesPerRow);
+
   current[index] = {
     ...current[index],
     folderId,
-    lastUpdated: new Date().toISOString(),
-  };
-  bookmarks.value = current;
-  await persistBookmarks();
-
-  enqueueSync("update_bookmark", { id: bookmarkId, updates: { folderId } });
-}
-
-export async function removeBookmarkFromFolder(bookmarkId) {
-  const current = [...bookmarks.peek()];
-  const index = current.findIndex((b) => b.id === bookmarkId);
-  if (index === -1) return;
-
-  current[index] = {
-    ...current[index],
-    folderId: null,
+    position,
     lastUpdated: new Date().toISOString(),
   };
   bookmarks.value = current;
@@ -83,6 +98,33 @@ export async function removeBookmarkFromFolder(bookmarkId) {
 
   enqueueSync("update_bookmark", {
     id: bookmarkId,
-    updates: { folderId: null },
+    updates: { folderId, position },
+  });
+}
+
+export async function removeBookmarkFromFolder(bookmarkId) {
+  const current = [...bookmarks.peek()];
+  const index = current.findIndex((b) => b.id === bookmarkId);
+  if (index === -1) return;
+
+  const tilesPerRow = settings.peek().tilesPerRow;
+  const rootItems = [
+    ...folders.peek(),
+    ...current.filter((b) => !b.folderId && b.id !== bookmarkId),
+  ];
+  const position = getNextPosition(rootItems, tilesPerRow);
+
+  current[index] = {
+    ...current[index],
+    folderId: null,
+    position,
+    lastUpdated: new Date().toISOString(),
+  };
+  bookmarks.value = current;
+  await persistBookmarks();
+
+  enqueueSync("update_bookmark", {
+    id: bookmarkId,
+    updates: { folderId: null, position },
   });
 }

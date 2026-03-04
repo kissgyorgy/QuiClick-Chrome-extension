@@ -22,19 +22,17 @@ def test_reorder_root_items():
 
     # Create a folder and a bookmark at root
     f_resp = client.post("/folders", json={"title": "Folder"})
-    b_resp = client.post(
-        "/bookmarks", json={"title": "BM", "url": "https://bm.com"}
-    )
+    b_resp = client.post("/bookmarks", json={"title": "BM", "url": "https://bm.com"})
     fid = f_resp.json()["id"]
     bid = b_resp.json()["id"]
 
-    # Reorder: swap positions
+    # Reorder: swap positions using [x, y] format
     resp = client.patch(
         "/reorder",
         json={
             "items": [
-                {"id": fid, "position": 10.0},
-                {"id": bid, "position": 5.0},
+                {"id": fid, "position": [5, 1]},
+                {"id": bid, "position": [3, 0]},
             ]
         },
     )
@@ -43,15 +41,13 @@ def test_reorder_root_items():
     # Verify new positions
     folder = client.get(f"/folders/{fid}").json()
     bookmark = client.get(f"/bookmarks/{bid}").json()
-    assert folder["position"] == 10.0
-    assert bookmark["position"] == 5.0
+    assert folder["position"] == [5, 1]
+    assert bookmark["position"] == [3, 0]
     _cleanup()
 
 
 def test_reorder_not_found():
     client = _authenticated_client()
-    resp = client.patch(
-        "/reorder", json={"items": [{"id": 9999, "position": 1.0}]}
-    )
+    resp = client.patch("/reorder", json={"items": [{"id": 9999, "position": [0, 0]}]})
     assert resp.status_code == 404
     _cleanup()

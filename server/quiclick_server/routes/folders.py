@@ -1,13 +1,15 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from quiclick_server.database import get_db
 from quiclick_server.models import Bookmark, Folder, Item
-from quiclick_server.routes.bookmarks import _bookmark_to_response
+from quiclick_server.routes.bookmarks import (
+    _bookmark_to_response,
+    _next_position,
+)
 from quiclick_server.schemas import (
     FolderCreate,
     FolderDetailResponse,
@@ -31,14 +33,9 @@ def _folder_to_response(folder: Folder) -> FolderResponse:
     )
 
 
-def _next_root_position(db: Session) -> float:
-    """Get the next position value for root-level items (shared space)."""
-    max_pos = (
-        db.query(func.max(Item.position))
-        .filter(Item.parent_id.is_(None), Item.deleted_at.is_(None))
-        .scalar()
-    )
-    return (max_pos or 0.0) + 1.0
+def _next_root_position(db: Session):
+    """Get the next grid position for root-level items (shared space)."""
+    return _next_position(db, None)
 
 
 @router.get("", response_model=list[FolderResponse])
@@ -47,7 +44,7 @@ def list_folders(db: Session = Depends(get_db)):
     folders = (
         db.query(Folder)
         .filter(Folder.deleted_at.is_(None))
-        .order_by(Folder.position)
+        .order_by(Folder.position_y, Folder.position_x)
         .all()
     )
     return [_folder_to_response(f) for f in folders]
@@ -61,7 +58,8 @@ def create_folder(body: FolderCreate, db: Session = Depends(get_db)):
     folder = Folder(
         title=body.title,
         parent_id=body.parent_id,
-        position=position,
+        position_x=position.x,
+        position_y=position.y,
     )
     db.add(folder)
     try:
@@ -83,7 +81,7 @@ def get_folder(folder_id: int, db: Session = Depends(get_db)):
     bookmarks = (
         db.query(Bookmark)
         .filter(Bookmark.parent_id == folder_id, Bookmark.deleted_at.is_(None))
-        .order_by(Bookmark.position)
+        .order_by(Bookmark.position_y, Bookmark.position_x)
         .all()
     )
 
@@ -112,7 +110,8 @@ def update_folder(
 
     folder.title = body.title
     if body.position is not None:
-        folder.position = body.position
+        folder.position_x = body.position.x
+        folder.position_y = body.position.y
 
     try:
         db.commit()
@@ -138,18 +137,18 @@ def delete_folder(folder_id: int, db: Session = Depends(get_db)):
         .filter(Bookmark.parent_id == folder_id, Bookmark.deleted_at.is_(None))
         .all()
     )
-    for child in children:
-        child.parent_id = None
-        child.last_updated = now
-
-    # Soft-delete the folder
+    # Soft-delete the folder first (frees its root position)
     folder.deleted_at = now
     folder.last_updated = now
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Position conflict when moving orphaned bookmarks to root",
-        )
+    db.flush()
+
+    # Move child bookmarks to root, assigning next available positions
+    for child in children:
+        pos = _next_position(db, None)
+        child.parent_id = None
+        child.position_x = pos.x
+        child.position_y = pos.y
+        child.last_updated = now
+        db.flush()
+
+    db.commit()

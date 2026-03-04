@@ -7,6 +7,7 @@ import {
   getHighResolutionFavicon,
 } from "./utils/favicon.js";
 import { enqueueSync } from "./sync-queue.js";
+import { getNextPosition } from "./hooks/use-bookmarks.js";
 
 export function PopupApp() {
   const [title, setTitle] = useState("");
@@ -47,7 +48,7 @@ export function PopupApp() {
     setStatus("adding");
 
     try {
-      const { bookmarks, folders } = await loadBookmarks();
+      const { bookmarks, folders, tilesPerRow } = await loadBookmarks();
       const normalizedUrl = normalizeUrl(url.trim());
 
       // Check if bookmark already exists
@@ -68,6 +69,8 @@ export function PopupApp() {
       }
 
       const now = new Date().toISOString();
+      const rootItems = [...folders, ...bookmarks.filter((b) => !b.folderId)];
+      const position = getNextPosition(rootItems, tilesPerRow);
       const newBookmark = {
         id: Date.now(),
         title: title.trim(),
@@ -76,7 +79,7 @@ export function PopupApp() {
         dateAdded: now,
         folderId: null,
         lastUpdated: now,
-        position: bookmarks.length,
+        position,
       };
 
       bookmarks.push(newBookmark);
@@ -173,13 +176,18 @@ export function PopupApp() {
 
 async function loadBookmarks() {
   try {
-    const result = await chrome.storage.local.get(["bookmarks", "folders"]);
+    const result = await chrome.storage.local.get([
+      "bookmarks",
+      "folders",
+      "bookmarkSettings",
+    ]);
     return {
       bookmarks: result.bookmarks || [],
       folders: result.folders || [],
+      tilesPerRow: result.bookmarkSettings?.tilesPerRow ?? 8,
     };
   } catch (error) {
-    return { bookmarks: [], folders: [] };
+    return { bookmarks: [], folders: [], tilesPerRow: 8 };
   }
 }
 

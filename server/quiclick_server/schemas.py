@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, field_validator
 
+from quiclick_server.models import Position
+
 # --- Favicon validation ---
 
 _DATA_URL_RE = re.compile(r"^data:([^;]+);base64,(.+)$", re.DOTALL)
@@ -89,7 +91,7 @@ class BookmarkCreate(BaseModel):
     url: str
     favicon: str | None = None
     parent_id: int | None = None
-    position: float | None = None
+    position: Position | None = None
 
     @field_validator("favicon", mode="before")
     @classmethod
@@ -102,7 +104,7 @@ class BookmarkUpdate(BaseModel):
     url: str | None = None
     favicon: str | None = None
     parent_id: int | None = None
-    position: float | None = None
+    position: Position | None = None
 
     @field_validator("favicon", mode="before")
     @classmethod
@@ -118,7 +120,7 @@ class BookmarkResponse(BaseModel):
     favicon: str | None
     date_added: datetime
     parent_id: int | None
-    position: float
+    position: Position
     last_updated: datetime | None = None
     deleted_at: datetime | None = None
 
@@ -131,12 +133,12 @@ class BookmarkResponse(BaseModel):
 class FolderCreate(BaseModel):
     title: str
     parent_id: int | None = None
-    position: float | None = None
+    position: Position | None = None
 
 
 class FolderUpdate(BaseModel):
     title: str | None = None
-    position: float | None = None
+    position: Position | None = None
 
 
 class FolderResponse(BaseModel):
@@ -145,7 +147,7 @@ class FolderResponse(BaseModel):
     title: str
     date_added: datetime
     parent_id: int | None
-    position: float
+    position: Position
     last_updated: datetime | None = None
     deleted_at: datetime | None = None
 
@@ -163,7 +165,7 @@ class FolderDetailResponse(FolderResponse):
 
 class ReorderItem(BaseModel):
     id: int
-    position: float
+    position: Position
 
 
 class ReorderRequest(BaseModel):
@@ -199,7 +201,7 @@ class ExportBookmark(BaseModel):
     favicon: str | None
     date_added: datetime
     parent_id: int | None
-    position: float
+    position: Position
 
 
 class ExportFolder(BaseModel):
@@ -207,7 +209,7 @@ class ExportFolder(BaseModel):
     title: str
     date_added: datetime
     parent_id: int | None
-    position: float
+    position: Position
 
 
 class ExportData(BaseModel):

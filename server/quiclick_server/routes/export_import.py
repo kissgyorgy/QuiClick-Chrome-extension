@@ -29,13 +29,13 @@ def export_data(db: Session = Depends(get_db)):
     bookmarks = (
         db.query(Bookmark)
         .filter(Bookmark.deleted_at.is_(None))
-        .order_by(Bookmark.position)
+        .order_by(Bookmark.position_y, Bookmark.position_x)
         .all()
     )
     folders = (
         db.query(Folder)
         .filter(Folder.deleted_at.is_(None))
-        .order_by(Folder.position)
+        .order_by(Folder.position_y, Folder.position_x)
         .all()
     )
     settings = db.get(Settings, 1)
@@ -95,7 +95,8 @@ def import_data(body: ExportData, db: Session = Depends(get_db)):
                 title=f_data.title,
                 date_added=f_data.date_added,
                 parent_id=f_data.parent_id,
-                position=f_data.position,
+                position_x=f_data.position.x,
+                position_y=f_data.position.y,
             )
             db.add(folder)
 
@@ -119,7 +120,8 @@ def import_data(body: ExportData, db: Session = Depends(get_db)):
                 favicon_mime=favicon_mime,
                 date_added=bm_data.date_added,
                 parent_id=bm_data.parent_id,
-                position=bm_data.position,
+                position_x=bm_data.position.x,
+                position_y=bm_data.position.y,
             )
             db.add(bookmark)
 

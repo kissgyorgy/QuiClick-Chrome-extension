@@ -68,6 +68,126 @@ def _migrate_user_db(engine):
             if "deleted_at" not in existing:
                 conn.execute(text("ALTER TABLE items ADD COLUMN deleted_at DATETIME"))
 
+            if "position_x" not in existing or "position_y" not in existing:
+                if "position_x" not in existing:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE items ADD COLUMN position_x INTEGER NOT NULL DEFAULT 0"
+                        )
+                    )
+                if "position_y" not in existing:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE items ADD COLUMN position_y INTEGER NOT NULL DEFAULT 0"
+                        )
+                    )
+
+                # Read tiles_per_row from settings (default 8)
+                tiles_per_row = 8
+                if inspector.has_table("settings"):
+                    row = conn.execute(
+                        text("SELECT tiles_per_row FROM settings WHERE id = 1")
+                    ).fetchone()
+                    if row:
+                        tiles_per_row = row[0]
+
+                # Convert old float position to (x, y) per group of parent_id,
+                # sorted by old position value.
+                if "position" in existing:
+                    parent_ids = conn.execute(
+                        text(
+                            "SELECT DISTINCT parent_id FROM items WHERE deleted_at IS NULL"
+                        )
+                    ).fetchall()
+                    for (parent_id,) in parent_ids:
+                        if parent_id is None:
+                            rows = conn.execute(
+                                text(
+                                    "SELECT id FROM items "
+                                    "WHERE parent_id IS NULL AND deleted_at IS NULL "
+                                    "ORDER BY position ASC"
+                                )
+                            ).fetchall()
+                        else:
+                            rows = conn.execute(
+                                text(
+                                    "SELECT id FROM items "
+                                    "WHERE parent_id = :pid AND deleted_at IS NULL "
+                                    "ORDER BY position ASC"
+                                ),
+                                {"pid": parent_id},
+                            ).fetchall()
+                        for index, (item_id,) in enumerate(rows):
+                            x = index % tiles_per_row
+                            y = index // tiles_per_row
+                            conn.execute(
+                                text(
+                                    "UPDATE items SET position_x = :x, position_y = :y "
+                                    "WHERE id = :id"
+                                ),
+                                {"x": x, "y": y, "id": item_id},
+                            )
+
+    # Remove old UNIQUE(parent_id, position) constraint and add DEFAULT 0
+    # to the legacy position column. SQLite can't ALTER constraints, so we
+    # recreate the table. Needed because the model no longer maps the old
+    # position column — without DEFAULT, INSERTs fail with NOT NULL violation.
+    if inspector.has_table("items"):
+        with engine.begin() as conn:
+            # Check if old table definition has the inline UNIQUE constraint
+            table_sql = conn.execute(
+                text(
+                    "SELECT sql FROM sqlite_master WHERE type='table' AND name='items'"
+                )
+            ).scalar()
+            if table_sql and "UNIQUE (parent_id, position)" in table_sql:
+                conn.execute(
+                    text(
+                        "CREATE TABLE items_new ("
+                        "  id INTEGER PRIMARY KEY NOT NULL,"
+                        "  type VARCHAR NOT NULL,"
+                        "  title VARCHAR NOT NULL,"
+                        "  date_added DATETIME NOT NULL,"
+                        "  parent_id INTEGER REFERENCES items_new(id),"
+                        "  position FLOAT NOT NULL DEFAULT 0,"
+                        "  last_updated DATETIME NOT NULL DEFAULT '2025-01-01T00:00:00',"
+                        "  deleted_at DATETIME,"
+                        "  position_x INTEGER NOT NULL DEFAULT 0,"
+                        "  position_y INTEGER NOT NULL DEFAULT 0"
+                        ")"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO items_new "
+                        "(id, type, title, date_added, parent_id, position,"
+                        " last_updated, deleted_at, position_x, position_y) "
+                        "SELECT id, type, title, date_added, parent_id, position,"
+                        " last_updated, deleted_at, position_x, position_y "
+                        "FROM items"
+                    )
+                )
+                conn.execute(text("DROP TABLE items"))
+                conn.execute(text("ALTER TABLE items_new RENAME TO items"))
+
+    # Add unique index on (coalesce(parent_id,0), position_x, position_y)
+    if inspector.has_table("items"):
+        with engine.begin() as conn:
+            has_index = conn.execute(
+                text(
+                    "SELECT 1 FROM sqlite_master "
+                    "WHERE type='index' AND name='uq_items_parent_pos'"
+                )
+            ).scalar()
+            if not has_index:
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX uq_items_parent_pos "
+                        "ON items (COALESCE(parent_id, 0), position_x, position_y) "
+                        "WHERE deleted_at IS NULL"
+                    )
+                )
+
     # Migrate settings table
     if inspector.has_table("settings"):
         existing = {col["name"] for col in inspector.get_columns("settings")}

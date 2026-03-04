@@ -1,19 +1,68 @@
 from datetime import datetime, timezone
 
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import core_schema
 from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
-    UniqueConstraint,
+    text,
 )
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import composite, declarative_base, relationship
 
 from quiclick_server.database import Base
+
+
+class Position:
+    """Grid position (x, y).
+
+    Works as both an SQLAlchemy composite value object and a Pydantic field
+    type that serializes as a 2-element JSON array ``[x, y]``.
+    """
+
+    def __init__(self, x: int, y: int):
+        self.x = int(x)
+        self.y = int(y)
+
+    # --- SQLAlchemy composite interface ---
+
+    def __composite_values__(self):
+        return self.x, self.y
+
+    def __eq__(self, other):
+        return isinstance(other, Position) and self.x == other.x and self.y == other.y
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __repr__(self):
+        return f"Position({self.x}, {self.y})"
+
+    # --- Pydantic interface ---
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source_type, handler: GetCoreSchemaHandler):
+        return core_schema.no_info_plain_validator_function(
+            cls._validate,
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda v: [v.x, v.y], info_arg=False
+            ),
+        )
+
+    @classmethod
+    def _validate(cls, v):
+        if isinstance(v, cls):
+            return v
+        if isinstance(v, (list, tuple)) and len(v) == 2:
+            return cls(int(v[0]), int(v[1]))
+        raise ValueError("Position must be [x, y]")
+
 
 # --- Per-user models (stored in {sub}.db) ---
 
@@ -30,7 +79,9 @@ class Item(Base):
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     parent_id = Column(Integer, ForeignKey("items.id"), nullable=True)
-    position = Column(Float, nullable=False)
+    position_x = Column(Integer, nullable=False, default=0)
+    position_y = Column(Integer, nullable=False, default=0)
+    position = composite(Position, position_x, position_y)
     last_updated = Column(
         DateTime,
         nullable=False,
@@ -41,7 +92,16 @@ class Item(Base):
 
     children = relationship("Item", backref="parent", remote_side=[id])
 
-    __table_args__ = (UniqueConstraint("parent_id", "position"),)
+    __table_args__ = (
+        Index(
+            "uq_items_parent_pos",
+            text("COALESCE(parent_id, 0)"),
+            "position_x",
+            "position_y",
+            unique=True,
+            sqlite_where=text("deleted_at IS NULL"),
+        ),
+    )
     __mapper_args__ = {
         "polymorphic_on": "type",
         "polymorphic_identity": "item",

@@ -1,5 +1,5 @@
-import { settings } from "../state/store.js";
-import { persistSettings } from "../state/storage-bridge.js";
+import { settings, bookmarks, folders } from "../state/store.js";
+import { persistSettings, persistBookmarks } from "../state/storage-bridge.js";
 import { enqueueSync } from "../sync-queue.js";
 
 export async function loadSettings() {
@@ -14,13 +14,91 @@ export async function loadSettings() {
 }
 
 export async function saveSettings(updates) {
+  const previous = settings.peek();
   settings.value = {
-    ...settings.peek(),
+    ...previous,
     ...updates,
     lastUpdated: new Date().toISOString(),
   };
   await persistSettings();
   enqueueSync("update_settings", { settings: settings.peek() });
+
+  // If tilesPerRow changed, reflow off-grid items
+  if (
+    updates.tilesPerRow !== undefined &&
+    updates.tilesPerRow !== previous.tilesPerRow
+  ) {
+    await reflowPositions(updates.tilesPerRow);
+  }
+}
+
+/**
+ * Move items whose position[0] >= newTilesPerRow into valid cells.
+ * Scans row-major for the first empty cell in the main grid.
+ */
+async function reflowPositions(newTilesPerRow) {
+  const currentBookmarks = [...bookmarks.peek()];
+  const currentFolders = [...folders.peek()];
+
+  // Collect all root-level items
+  const rootFolders = currentFolders;
+  const rootBookmarks = currentBookmarks.filter((b) => !b.folderId);
+  const allRoot = [...rootFolders, ...rootBookmarks];
+
+  const offGrid = allRoot.filter(
+    (i) => (i.position || [0, 0])[0] >= newTilesPerRow,
+  );
+  if (offGrid.length === 0) return;
+
+  // Build occupied set (only in-bounds items)
+  const occupied = new Set();
+  for (const item of allRoot) {
+    const [x, y] = item.position || [0, 0];
+    if (x < newTilesPerRow) {
+      occupied.add(`${x},${y}`);
+    }
+  }
+
+  function findNextEmpty() {
+    for (let y = 0; ; y++) {
+      for (let x = 0; x < newTilesPerRow; x++) {
+        if (!occupied.has(`${x},${y}`)) {
+          occupied.add(`${x},${y}`);
+          return [x, y];
+        }
+      }
+    }
+  }
+
+  const reorderItems = [];
+  for (const item of offGrid) {
+    const newPos = findNextEmpty();
+    item.position = newPos;
+    item.lastUpdated = new Date().toISOString();
+    reorderItems.push({ id: item.id, position: newPos });
+  }
+
+  // Write back
+  const updatedBookmarks = currentBookmarks.map((b) => {
+    const found = offGrid.find((o) => o.id === b.id);
+    return found
+      ? { ...b, position: found.position, lastUpdated: found.lastUpdated }
+      : b;
+  });
+  const updatedFolders = currentFolders.map((f) => {
+    const found = offGrid.find((o) => o.id === f.id);
+    return found
+      ? { ...f, position: found.position, lastUpdated: found.lastUpdated }
+      : f;
+  });
+
+  bookmarks.value = updatedBookmarks;
+  folders.value = updatedFolders;
+  await persistBookmarks();
+
+  if (reorderItems.length > 0) {
+    enqueueSync("reorder", { items: reorderItems });
+  }
 }
 
 // Map tiles per row to Tailwind grid/gap classes
@@ -63,6 +141,27 @@ const gapMapping = {
   9: { x: "gap-x-36", y: "gap-y-18" },
   10: { x: "gap-x-40", y: "gap-y-20" },
 };
+
+// Pixel gap values corresponding to each tileGap setting level
+// x gap: 0,16,32,48,64,80,96,112,128,144,160
+// y gap: 0,8,16,24,32,40,48,56,64,72,80
+const gapPxMapping = {
+  0: { x: 0, y: 0 },
+  1: { x: 16, y: 8 },
+  2: { x: 32, y: 16 },
+  3: { x: 48, y: 24 },
+  4: { x: 64, y: 32 },
+  5: { x: 80, y: 40 },
+  6: { x: 96, y: 48 },
+  7: { x: 112, y: 56 },
+  8: { x: 128, y: 64 },
+  9: { x: 144, y: 72 },
+  10: { x: 160, y: 80 },
+};
+
+export function gapPxFromSetting(tileGap) {
+  return gapPxMapping[tileGap] || { x: 16, y: 8 };
+}
 
 export function getGridClasses(tilesPerRow, tileGap) {
   const gridClass = gridClasses[tilesPerRow] || "grid-cols-8";

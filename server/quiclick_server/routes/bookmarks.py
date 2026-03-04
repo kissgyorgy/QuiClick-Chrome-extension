@@ -2,12 +2,11 @@ import base64
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from quiclick_server.database import get_db
-from quiclick_server.models import Bookmark, Item
+from quiclick_server.models import Bookmark, Item, Position, Settings
 from quiclick_server.schemas import (
     BookmarkCreate,
     BookmarkResponse,
@@ -51,14 +50,28 @@ def _bookmark_to_response(bookmark: Bookmark) -> BookmarkResponse:
     )
 
 
-def _next_position(db: Session, parent_id: int | None) -> float:
-    """Get the next position value for items in the given scope."""
-    max_pos = (
-        db.query(func.max(Item.position))
-        .filter(Item.parent_id == parent_id, Item.deleted_at.is_(None))
-        .scalar()
-    )
-    return (max_pos or 0.0) + 1.0
+def _get_tiles_per_row(db: Session) -> int:
+    """Return tiles_per_row from settings (default 8)."""
+    settings = db.get(Settings, 1)
+    return settings.tiles_per_row if settings else 8
+
+
+def _next_position(db: Session, parent_id: int | None) -> Position:
+    """Get the next grid Position(x, y) for items in the given scope."""
+    tiles_per_row = _get_tiles_per_row(db)
+    query = db.query(Item.position_x, Item.position_y).filter(Item.deleted_at.is_(None))
+    if parent_id is None:
+        query = query.filter(Item.parent_id.is_(None))
+    else:
+        query = query.filter(Item.parent_id == parent_id)
+    rows = query.all()
+    if not rows:
+        return Position(0, 0)
+    max_y = max(y for _, y in rows)
+    max_x = max(x for x, y in rows if y == max_y)
+    if max_x + 1 >= tiles_per_row:
+        return Position(0, max_y + 1)
+    return Position(max_x + 1, max_y)
 
 
 @router.get("", response_model=list[BookmarkResponse])
@@ -79,7 +92,7 @@ def list_bookmarks(
                     status_code=422, detail="folder_id must be an integer or 'root'"
                 )
             query = query.filter(Bookmark.parent_id == fid)
-    bookmarks = query.order_by(Bookmark.position).all()
+    bookmarks = query.order_by(Bookmark.position_y, Bookmark.position_x).all()
     return [_bookmark_to_response(b) for b in bookmarks]
 
 
@@ -106,7 +119,8 @@ def create_bookmark(
         favicon=favicon_bytes,
         favicon_mime=favicon_mime,
         parent_id=body.parent_id,
-        position=position,
+        position_x=position.x,
+        position_y=position.y,
     )
     db.add(bookmark)
     try:
@@ -145,7 +159,8 @@ def update_bookmark_full(
     bookmark.url = body.url
     bookmark.parent_id = body.parent_id
     if body.position is not None:
-        bookmark.position = body.position
+        bookmark.position_x = body.position.x
+        bookmark.position_y = body.position.y
 
     if body.favicon:
         favicon_bytes, favicon_mime = _parse_favicon_data_url(body.favicon)
@@ -182,7 +197,8 @@ def update_bookmark_partial(
     if body.parent_id is not None:
         bookmark.parent_id = body.parent_id
     if body.position is not None:
-        bookmark.position = body.position
+        bookmark.position_x = body.position.x
+        bookmark.position_y = body.position.y
     if body.favicon is not None:
         favicon_bytes, favicon_mime = _parse_favicon_data_url(body.favicon)
         bookmark.favicon = favicon_bytes
@@ -218,16 +234,24 @@ def reorder_bookmarks(
     db: Session = Depends(get_db),
 ):
     """Bulk-update positions for multiple bookmarks."""
-    for item in body.items:
-        bookmark = db.get(Bookmark, item.id)
+    items = []
+    for entry in body.items:
+        bookmark = db.get(Bookmark, entry.id)
         if not bookmark:
-            raise HTTPException(status_code=404, detail=f"Bookmark {item.id} not found")
-        bookmark.position = item.position
+            raise HTTPException(
+                status_code=404, detail=f"Bookmark {entry.id} not found"
+            )
+        items.append((bookmark, entry.position))
 
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="Position conflict during reorder")
+    # Temporary negative positions to avoid intermediate conflicts
+    for idx, (bookmark, _) in enumerate(items):
+        bookmark.position_x = -(idx + 1)
+        bookmark.position_y = -1
+    db.flush()
 
+    for bookmark, pos in items:
+        bookmark.position_x = pos.x
+        bookmark.position_y = pos.y
+
+    db.commit()
     return {"detail": "Reordered"}

@@ -8,14 +8,21 @@ import {
 } from "../state/store.js";
 import { useBookmarkDragHandlers } from "../hooks/use-drag-and-drop.js";
 
-export function BookmarkTile({ bookmark }) {
+export function BookmarkTile({ bookmark, gridX, gridY }) {
   const { showTitles } = settings.value;
   const [faviconError, setFaviconError] = useState(false);
-  const drag = useBookmarkDragHandlers(bookmark.id);
+  const drag = useBookmarkDragHandlers(bookmark.id, gridX, gridY);
 
   const isDraggingThis =
     dragState.value.draggedBookmarkId === bookmark.id &&
     dragState.value.isDragging;
+
+  const dropTarget = dragState.value.dropTarget;
+  const isInsertTarget =
+    dropTarget?.type === "insert" &&
+    dropTarget.x === (gridX ?? (bookmark.position || [0, 0])[0]) &&
+    dropTarget.y === (gridY ?? (bookmark.position || [0, 0])[1]);
+  const insertSide = isInsertTarget ? dropTarget.side : null;
 
   function handleClick(e) {
     if (!dragState.peek().isDragging && e.button === 0) {
@@ -42,10 +49,13 @@ export function BookmarkTile({ bookmark }) {
   }
 
   const paddingClass = showTitles ? "pt-2 px-4 pb-6" : "p-4";
+  const x = gridX ?? (bookmark.position || [0, 0])[0];
+  const y = gridY ?? (bookmark.position || [0, 0])[1];
 
   return (
     <div
       class={`tile tile-3d tile-3d-bookmark w-24 h-24 relative rounded-lg cursor-pointer ${isDraggingThis ? "opacity-50" : ""}`}
+      style={{ gridColumn: x + 1, gridRow: y + 1 }}
       data-bookmark-id={bookmark.id}
       draggable={true}
       title={bookmark.title}
@@ -55,6 +65,7 @@ export function BookmarkTile({ bookmark }) {
       onDragStart={drag.onDragStart}
       onDragEnd={drag.onDragEnd}
       onDragOver={drag.onDragOver}
+      onDragLeave={drag.onDragLeave}
       onDrop={drag.onDrop}
     >
       <a
@@ -87,6 +98,12 @@ export function BookmarkTile({ bookmark }) {
             {bookmark.title}
           </span>
         </div>
+      )}
+      {insertSide === "left" && (
+        <div class="absolute top-0 left-0 bottom-0 w-0.5 bg-sky-500 rounded-full z-10" />
+      )}
+      {insertSide === "right" && (
+        <div class="absolute top-0 right-0 bottom-0 w-0.5 bg-sky-500 rounded-full z-10" />
       )}
     </div>
   );
