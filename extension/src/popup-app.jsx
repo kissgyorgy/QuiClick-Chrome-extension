@@ -1,4 +1,4 @@
-import { useState, useEffect } from "preact/hooks";
+import { useState, useEffect, useRef } from "preact/hooks";
 import { useFaviconPicker } from "./hooks/use-favicons.js";
 import { FaviconPicker } from "./components/FaviconPicker.jsx";
 import { normalizeUrl, extractTitleFromUrl } from "./utils/url.js";
@@ -12,6 +12,7 @@ export function PopupApp() {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [status, setStatus] = useState("idle"); // idle | adding | done
+  const titleRef = useRef(null);
 
   const { faviconUrls, selectedFavicon, selectFavicon, isLoading } =
     useFaviconPicker(url, (extracted) => {
@@ -36,6 +37,7 @@ export function PopupApp() {
         console.error("Error loading current tab:", error);
       }
     })();
+    titleRef.current?.focus();
   }, []);
 
   async function handleSubmit(e) {
@@ -115,6 +117,7 @@ export function PopupApp() {
             class="w-full px-3 py-2 border border-custom-border rounded-lg focus:outline-none focus:ring-2 focus:ring-custom-accent focus:border-transparent"
             autocomplete="off"
             required
+            ref={titleRef}
           />
         </div>
         <div class="mb-6">

@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useState, useEffect, useRef } from "preact/hooks";
 import { activeModal, folders, currentFolderId } from "../state/store.js";
 import { renameFolder } from "../hooks/use-folders.js";
 
@@ -14,6 +14,11 @@ export function RenameFolderModal() {
 
 function RenameFolderForm({ folder }) {
   const [name, setName] = useState(folder.name);
+  const nameRef = useRef(null);
+
+  useEffect(() => {
+    nameRef.current?.focus();
+  }, []);
 
   function handleClose() {
     currentFolderId.value = null;
@@ -49,7 +54,7 @@ function RenameFolderForm({ folder }) {
               class="w-full px-3 py-2 border border-custom-border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
               autocomplete="off"
               required
-              autoFocus
+              ref={nameRef}
             />
           </div>
           <div class="flex space-x-3">

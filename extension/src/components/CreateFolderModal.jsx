@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useState, useEffect, useRef } from "preact/hooks";
 import { activeModal } from "../state/store.js";
 import { createFolder } from "../hooks/use-folders.js";
 
@@ -10,6 +10,11 @@ export function CreateFolderModal() {
 
 function CreateFolderForm() {
   const [name, setName] = useState("");
+  const nameRef = useRef(null);
+
+  useEffect(() => {
+    nameRef.current?.focus();
+  }, []);
 
   function handleClose() {
     activeModal.value = null;
@@ -43,7 +48,7 @@ function CreateFolderForm() {
               class="w-full px-3 py-2 border border-custom-border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
               autocomplete="off"
               required
-              autoFocus
+              ref={nameRef}
             />
           </div>
           <div class="flex space-x-3">

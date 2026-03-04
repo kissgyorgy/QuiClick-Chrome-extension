@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useState, useEffect, useRef } from "preact/hooks";
 import { activeModal } from "../state/store.js";
 import { addBookmark } from "../hooks/use-bookmarks.js";
 import { useFaviconPicker } from "../hooks/use-favicons.js";
@@ -18,6 +18,11 @@ export function AddBookmarkModal({ prefillUrl = "", prefillTitle = "" }) {
 function AddBookmarkForm({ prefillUrl, prefillTitle }) {
   const [title, setTitle] = useState(prefillTitle);
   const [url, setUrl] = useState(prefillUrl);
+  const titleRef = useRef(null);
+
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
 
   const { faviconUrls, selectedFavicon, selectFavicon, isLoading } =
     useFaviconPicker(url, (extracted) => {
@@ -63,7 +68,7 @@ function AddBookmarkForm({ prefillUrl, prefillTitle }) {
               class="w-full px-3 py-2 border border-custom-border rounded-lg focus:outline-none focus:ring-2 focus:ring-custom-accent focus:border-transparent"
               autocomplete="off"
               required
-              autoFocus
+              ref={titleRef}
             />
           </div>
           <div class="mb-4">

@@ -24,6 +24,7 @@ function EditBookmarkForm({ isDuplicate }) {
   const [title, setTitle] = useState(bookmark?.title || "");
   const [url, setUrl] = useState(bookmark?.url || "");
   const modalRef = useRef(null);
+  const titleRef = useRef(null);
 
   const { faviconUrls, selectedFavicon, selectFavicon, isLoading } =
     useFaviconPicker(url, (extracted) => {
@@ -50,6 +51,10 @@ function EditBookmarkForm({ isDuplicate }) {
     modalRef.current.style.left = `${left}px`;
     modalRef.current.style.top = `${top}px`;
   }, [bookmarkId]);
+
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
 
   function handleClose() {
     // For duplicate: nothing was created yet, just close.
@@ -111,7 +116,7 @@ function EditBookmarkForm({ isDuplicate }) {
                 class="w-full px-3 py-2 border border-custom-border rounded-lg focus:outline-none focus:ring-2 focus:ring-custom-accent focus:border-transparent"
                 autocomplete="off"
                 required
-                autoFocus
+                ref={titleRef}
               />
             </div>
             <div class="mb-4">
