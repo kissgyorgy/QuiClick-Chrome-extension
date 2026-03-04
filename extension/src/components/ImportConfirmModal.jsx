@@ -8,6 +8,7 @@ import {
 } from "../state/store.js";
 import { persistBookmarks, persistSettings } from "../state/storage-bridge.js";
 import { enqueueSync } from "../sync-queue.js";
+import { Modal } from "./Modal.jsx";
 
 export function ImportConfirmModal() {
   if (activeModal.value !== "importConfirm") return null;
@@ -62,51 +63,42 @@ export function ImportConfirmModal() {
   }
 
   return (
-    <div
-      class="modal-backdrop fixed inset-0 flex items-center justify-center z-50 bg-sky-200/60 backdrop-blur-md"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) handleClose();
-      }}
-    >
-      <div class="modal-content rounded-xl p-6 w-96 mx-4 backdrop-blur-xl border border-white/80">
-        <h3 class="text-lg font-semibold text-custom-text mb-4">
-          Confirm Import
-        </h3>
-        <div class="mb-4">
-          <p class="text-sm text-gray-600 mb-3">
-            Import data from <span class="font-medium">{fileName}</span>?
-          </p>
-          <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-            <div class="text-sm text-amber-800">
-              <p class="font-medium mb-1">
-                This will replace your current data:
-              </p>
-              <ul class="space-y-1">
-                <li>• {bookmarkCount} bookmarks</li>
-                <li>• {folderCount} folders</li>
-                <li>• Settings</li>
-              </ul>
-            </div>
+    <Modal onClose={handleClose}>
+      <h3 class="text-lg font-semibold text-custom-text mb-4">
+        Confirm Import
+      </h3>
+      <div class="mb-4">
+        <p class="text-sm text-gray-600 mb-3">
+          Import data from <span class="font-medium">{fileName}</span>?
+        </p>
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+          <div class="text-sm text-amber-800">
+            <p class="font-medium mb-1">This will replace your current data:</p>
+            <ul class="space-y-1">
+              <li>• {bookmarkCount} bookmarks</li>
+              <li>• {folderCount} folders</li>
+              <li>• Settings</li>
+            </ul>
           </div>
-          <p class="text-xs text-gray-500">
-            Current data will be backed up automatically before import.
-          </p>
         </div>
-        <div class="flex space-x-3">
-          <button
-            onClick={handleClose}
-            class="flex-1 px-3 py-2 border border-custom-border rounded-lg text-custom-text hover:bg-gray-50 transition-colors cursor-pointer font-bold text-sm"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            class="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer font-bold text-sm"
-          >
-            Import
-          </button>
-        </div>
+        <p class="text-xs text-gray-500">
+          Current data will be backed up automatically before import.
+        </p>
       </div>
-    </div>
+      <div class="flex space-x-3">
+        <button
+          onClick={handleClose}
+          class="flex-1 px-3 py-2 border border-custom-border rounded-lg text-custom-text hover:bg-gray-50 transition-colors cursor-pointer font-bold text-sm"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleConfirm}
+          class="flex-1 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer font-bold text-sm"
+        >
+          Import
+        </button>
+      </div>
+    </Modal>
   );
 }

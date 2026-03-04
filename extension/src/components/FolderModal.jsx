@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "preact/hooks";
+import { ModalBackdrop } from "./Modal.jsx";
 import {
   activeModal,
   bookmarks,
@@ -122,14 +123,15 @@ function FolderModalContent({ folder, folderId }) {
   }
 
   return (
-    <div
-      class={`modal-backdrop fixed inset-0 flex items-start justify-center pt-16 pb-32 z-50 bg-sky-200/60 backdrop-blur-md ${dropHover ? "bg-blue-100/20" : ""}`}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) handleClose();
+    <ModalBackdrop
+      onClose={handleClose}
+      align="items-start justify-center"
+      backdropClass={`pt-16 pb-32 ${dropHover ? "bg-blue-100/20" : ""}`}
+      backdropProps={{
+        onDragOver: handleBackdropDragOver,
+        onDragLeave: handleBackdropDragLeave,
+        onDrop: handleBackdropDrop,
       }}
-      onDragOver={handleBackdropDragOver}
-      onDragLeave={handleBackdropDragLeave}
-      onDrop={handleBackdropDrop}
     >
       {dropHover && (
         <div class="fixed inset-0 pointer-events-none flex items-center justify-center z-50">
@@ -177,7 +179,7 @@ function FolderModalContent({ folder, folderId }) {
           </div>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
 

@@ -3,6 +3,7 @@ import { activeModal, bookmarks, currentBookmarkId } from "../state/store.js";
 import { updateBookmark, duplicateBookmark } from "../hooks/use-bookmarks.js";
 import { useFaviconPicker } from "../hooks/use-favicons.js";
 import { FaviconPicker } from "./FaviconPicker.jsx";
+import { ModalBackdrop } from "./Modal.jsx";
 
 export function EditBookmarkModal() {
   const modal = activeModal.value;
@@ -90,12 +91,7 @@ function EditBookmarkForm({ isDuplicate }) {
   if (!bookmark) return null;
 
   return (
-    <div
-      class="modal-backdrop fixed inset-0 flex items-center justify-center z-60 bg-sky-200/60 backdrop-blur-md"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) handleClose();
-      }}
-    >
+    <ModalBackdrop onClose={handleClose} zIndex="z-60">
       <div
         ref={modalRef}
         class="edit-modal fixed z-60 w-96 backdrop-blur-xl border border-white/80 rounded-xl"
@@ -161,6 +157,6 @@ function EditBookmarkForm({ isDuplicate }) {
           </form>
         </div>
       </div>
-    </div>
+    </ModalBackdrop>
   );
 }
