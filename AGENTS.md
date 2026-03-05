@@ -16,6 +16,9 @@ just extension::build
 
 # Package extension for Chrome Web Store
 just extension::package
+
+# Deploy server to production
+just deploy
 ```
 
 ## Architecture
@@ -23,7 +26,7 @@ just extension::package
 **Monorepo with two subsystems:**
 
 ```
-extension/     Chrome extension (JS, Bun, Vite, Tailwind)
+extension/     Chrome extension (Preact, Preact Signals, Vite, Tailwind v4, Bun)
 server/        Sync server (Python, FastAPI, SQLAlchemy, SQLite)
 ```
 
@@ -42,29 +45,36 @@ FastAPI app with Google OAuth. Each authenticated user gets their own SQLite dat
 
 ### Extension (`extension/`)
 
-Chrome Manifest V3 extension that overrides the new tab page. 
-Vite bundles `src/script.js` → `dist/script.js` (IIFE format, no minification).
-Tailwind CSS built separately via `@tailwindcss/cli`.
+Chrome Manifest V3 extension that overrides the new tab page.
+Vite builds multiple entry points: `newtab.jsx`, `popup.jsx`, `background.js`, and `tailwind.css`.
+Uses **Preact** for rendering and **Preact Signals** for reactive state.
 
-- `src/script.js` — Main new tab page entry point (bundled by Vite → `dist/script.js`)
-- `src/` — Modular JS: `bookmarks.js`, `folders.js`, `settings.js`, `favicon.js`, `ui.js`
-- `api.js` — API client singleton; translates between server snake_case and extension camelCase
-- `sync-queue.js` — Enqueue operations for offline-first sync; coalesces settings/reorder ops
-- `background.js` — Service worker: queue processor, delta pull, exponential backoff, local↔server ID mapping
-- `popup.js` — "Add bookmark" popup with favicon discovery and selection
-- `manifest.json` — Permissions: storage, bookmarks, tabs, alarms; host permissions for server
+**Entry points:**
+
+- `src/newtab.jsx` — New tab page entry (renders `newtab-app.jsx`)
+- `src/popup.jsx` — Browser action popup (renders `popup-app.jsx`)
+- `src/background.js` — Service worker: queue processor, delta pull, exponential backoff, local↔server ID mapping
+
+**State management (`src/state/`):**
+
+- `store.js` — Preact signals for all app state (bookmarks, folders, settings, auth, UI modals, drag state)
+- `storage-bridge.js` — Bidirectional sync between signals and `chrome.storage.local`; handles external changes from background.js
+
+**UI (`src/components/`):** Preact JSX components — BookmarkGrid, FolderTile, modals (Add/Edit/Delete), SettingsModal, ContextMenu, etc.
+
+**Hooks (`src/hooks/`):** Custom hooks for bookmarks, folders, settings, drag-and-drop, favicons — encapsulate CRUD logic with signal updates + storage persistence + sync queue enqueuing.
+
+**Sync layer:**
+
+- `src/api.js` — API client singleton; translates between server snake_case and extension camelCase
+- `src/sync-queue.js` — Enqueue operations for offline-first sync; coalesces settings/reorder ops
 
 ### Sync Model
 
-Offline-first: the extension writes to `chrome.storage.local` immediately, then
-enqueues sync operations. The background service worker processes the queue
-against the server with retry/backoff. Delta pull uses `If-Modified-Since` /
-`Last-Modified` headers via the `/changes` endpoint. Local-to-server ID mapping
-handles optimistic creates.
+Offline-first: the extension writes to `chrome.storage.local` immediately (via signals → storage bridge), then enqueues sync operations. The background service worker processes the queue against the server with retry/backoff. Delta pull uses `If-Modified-Since` / `Last-Modified` headers via the `/changes` endpoint. Local-to-server ID mapping handles optimistic creates.
 
 ## Environment
 
-Managed by devenv (`devenv.nix`). Python deps via uv (`server/pyproject.toml`),
-JS deps via Bun (`extension/package.json`).
-Required env vars (`QUICLICK_GOOGLE_CLIENT_ID`, `QUICLICK_GOOGLE_CLIENT_SECRET`)
-should be set in `devenv.local.nix`.
+Managed by devenv (`devenv.nix`). Python deps via uv (`server/pyproject.toml`), JS deps via Bun (`extension/package.json`).
+Required env vars (`QUICLICK_GOOGLE_CLIENT_ID`, `QUICLICK_GOOGLE_CLIENT_SECRET`) should be set in `devenv.local.nix`.
+Production deploy via `just deploy` — builds Nix package, copies to server, restarts systemd service.
