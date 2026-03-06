@@ -1,5 +1,6 @@
 import base64
 from datetime import datetime, timezone
+from functools import partial
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
@@ -48,6 +49,23 @@ def _bookmark_to_response(bookmark: Bookmark) -> BookmarkResponse:
         last_updated=bookmark.last_updated,
         deleted_at=bookmark.deleted_at,
     )
+
+
+def check_not_none(field_name: str, value):
+    if value is None:
+        raise HTTPException(status_code=422, detail=f"{field_name} cannot be null")
+    return value
+
+
+def apply_patch_field(
+    existing, patch_body, provided_fields, field_name: str, *, allow_none=False
+):
+    if field_name not in provided_fields:
+        return
+    patch_value = getattr(patch_body, field_name)
+    if patch_value is None and not allow_none:
+        raise HTTPException(status_code=422, detail=f"{field_name} cannot be null")
+    setattr(existing, field_name, patch_value)
 
 
 def _get_tiles_per_row(db: Session) -> int:
@@ -190,19 +208,24 @@ def update_bookmark_partial(
     if not bookmark or bookmark.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Bookmark not found")
 
-    if body.title is not None:
-        bookmark.title = body.title
-    if body.url is not None:
-        bookmark.url = body.url
-    if body.parent_id is not None:
-        bookmark.parent_id = body.parent_id
-    if body.position is not None:
-        bookmark.position_x = body.position.x
-        bookmark.position_y = body.position.y
-    if body.favicon is not None:
-        favicon_bytes, favicon_mime = _parse_favicon_data_url(body.favicon)
-        bookmark.favicon = favicon_bytes
-        bookmark.favicon_mime = favicon_mime
+    provided_fields = body.model_fields_set
+    apply_patch = partial(apply_patch_field, bookmark, body, provided_fields)
+
+    apply_patch("title")
+    apply_patch("url")
+    apply_patch("parent_id", allow_none=True)
+    if "position" in provided_fields:
+        position = check_not_none("position", body.position)
+        bookmark.position_x = position.x
+        bookmark.position_y = position.y
+    if "favicon" in provided_fields:
+        if body.favicon is None:
+            bookmark.favicon = None
+            bookmark.favicon_mime = None
+        else:
+            favicon_bytes, favicon_mime = _parse_favicon_data_url(body.favicon)
+            bookmark.favicon = favicon_bytes
+            bookmark.favicon_mime = favicon_mime
 
     try:
         db.commit()

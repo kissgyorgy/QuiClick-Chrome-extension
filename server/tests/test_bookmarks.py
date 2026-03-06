@@ -139,6 +139,52 @@ def test_update_bookmark_partial():
     _cleanup()
 
 
+def test_update_bookmark_partial_can_clear_parent():
+    client = _authenticated_client()
+
+    folder_resp = client.post("/folders", json={"title": "Work"})
+    fid = folder_resp.json()["id"]
+
+    create_resp = client.post(
+        "/bookmarks",
+        json={"title": "Nested", "url": "https://nested.com", "parent_id": fid},
+    )
+    bid = create_resp.json()["id"]
+    assert create_resp.json()["parent_id"] == fid
+
+    resp = client.patch(
+        f"/bookmarks/{bid}",
+        json={"parent_id": None, "position": [1, 0]},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["parent_id"] is None
+
+    get_resp = client.get(f"/bookmarks/{bid}")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["parent_id"] is None
+    _cleanup()
+
+
+def test_update_bookmark_partial_rejects_null_title():
+    client = _authenticated_client()
+    create_resp = client.post(
+        "/bookmarks", json={"title": "Original", "url": "https://orig.com"}
+    )
+    bid = create_resp.json()["id"]
+
+    resp = client.patch(
+        f"/bookmarks/{bid}",
+        json={"title": None},
+    )
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "title cannot be null"
+
+    get_resp = client.get(f"/bookmarks/{bid}")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["title"] == "Original"
+    _cleanup()
+
+
 # --- Delete ---
 
 
