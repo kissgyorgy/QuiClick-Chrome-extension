@@ -22,7 +22,7 @@ export function BookmarkGrid() {
       const rect = gridRef.current.getBoundingClientRect();
       const gapPx = gapPxFromSetting(tileGap).y;
       const available = window.innerHeight - rect.top;
-      const rows = Math.max(2, Math.ceil(available / (TILE_SIZE + gapPx)));
+      const rows = Math.max(2, Math.floor(available / (TILE_SIZE + gapPx)));
       setViewportRows(rows);
     }
     update();
@@ -61,7 +61,7 @@ export function BookmarkGrid() {
     const y = (bookmark.position || [0, 0])[1];
     if (y > maxOccupiedRow) maxOccupiedRow = y;
   }
-  const totalRows = Math.max(maxOccupiedRow + 2, viewportRows);
+  const totalRows = Math.max(maxOccupiedRow + 1, viewportRows);
 
   // Gap CSS values
   const gapXPx = gapPx.x;

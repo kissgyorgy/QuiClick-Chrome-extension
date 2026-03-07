@@ -68,7 +68,7 @@ function FolderModalContent({ folder, folderId }) {
     return () => window.removeEventListener("resize", update);
   }, [tileGap]);
 
-  const totalRows = Math.max(maxRow + 2, visibleRows);
+  const totalRows = Math.max(maxRow + 1, visibleRows);
 
   function handleClose() {
     openFolderId.value = null;
