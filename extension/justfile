@@ -10,3 +10,14 @@ package: build
 package-clean:
     rm -f quiclick-chrome-extension.zip
     just extension::package
+
+# Print the stable extension ID and chrome-extension:// base URL
+extension-id:
+    #!/usr/bin/env python3
+    import base64, hashlib, json, pathlib
+    manifest = json.loads(pathlib.Path("manifest.json").read_text())
+    key = base64.b64decode(manifest["key"])
+    h = hashlib.sha256(key).hexdigest()[:32]
+    ext_id = "".join(chr(ord("a") + int(c, 16)) for c in h)
+    print(f"Extension ID: {ext_id}")
+    print(f"chrome-extension://{ext_id}/")

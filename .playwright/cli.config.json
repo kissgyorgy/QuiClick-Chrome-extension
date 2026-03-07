@@ -1,0 +1,11 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "launchOptions": {
+      "args": [
+        "--disable-extensions-except=/home/walkman/Projects/quiclick/extension/dist",
+        "--load-extension=/home/walkman/Projects/quiclick/extension/dist"
+      ]
+    }
+  }
+}
