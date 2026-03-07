@@ -3,6 +3,7 @@ import {
   addBookmarkPosition,
   addBookmarkFolderId,
   dragState,
+  storeHydrated,
 } from "../state/store.js";
 import {
   useEmptyCellDropHandlers,
@@ -41,7 +42,7 @@ export function EmptyCell({ x, y, showAddButton, folderId }) {
     );
   }
 
-  if (showAddButton) {
+  if (storeHydrated.value && showAddButton) {
     return (
       <div
         class={`${baseClass} tile-3d tile-3d-add cursor-pointer group`}

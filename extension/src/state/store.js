@@ -10,6 +10,7 @@ export const settings = signal({
   showAddButton: true,
 });
 export const authState = signal({ authenticated: false, user: null });
+export const storeHydrated = signal(false);
 
 // Transient UI state
 export const currentBookmarkId = signal(null);

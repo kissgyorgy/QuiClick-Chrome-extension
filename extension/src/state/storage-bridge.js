@@ -1,4 +1,10 @@
-import { bookmarks, folders, settings, authState } from "./store.js";
+import {
+  bookmarks,
+  folders,
+  settings,
+  authState,
+  storeHydrated,
+} from "./store.js";
 
 /**
  * Ensure a position value is [x, y].
@@ -20,18 +26,24 @@ function normalizeItems(items, tilesPerRow) {
 
 // Read initial state from chrome.storage.local into signals
 export async function initStore() {
-  const data = await chrome.storage.local.get([
-    "bookmarks",
-    "folders",
-    "bookmarkSettings",
-    "authState",
-  ]);
-  const tilesPerRow = data.bookmarkSettings?.tilesPerRow ?? 8;
-  bookmarks.value = normalizeItems(data.bookmarks, tilesPerRow);
-  folders.value = normalizeItems(data.folders, tilesPerRow);
-  if (data.bookmarkSettings)
-    settings.value = { ...settings.peek(), ...data.bookmarkSettings };
-  if (data.authState) authState.value = data.authState;
+  storeHydrated.value = false;
+
+  try {
+    const data = await chrome.storage.local.get([
+      "bookmarks",
+      "folders",
+      "bookmarkSettings",
+      "authState",
+    ]);
+    const tilesPerRow = data.bookmarkSettings?.tilesPerRow ?? 8;
+    bookmarks.value = normalizeItems(data.bookmarks, tilesPerRow);
+    folders.value = normalizeItems(data.folders, tilesPerRow);
+    if (data.bookmarkSettings)
+      settings.value = { ...settings.peek(), ...data.bookmarkSettings };
+    if (data.authState) authState.value = data.authState;
+  } finally {
+    storeHydrated.value = true;
+  }
 }
 
 // Listen for external changes (from background.js or other tabs)
